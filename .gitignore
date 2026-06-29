@@ -1,0 +1,15 @@
+node_modules/
+.env
+.env.local
+
+# build frontend (genere a chaque deploiement, pas versionne)
+backend/src/public/
+frontend/dist/
+
+# IDE
+.idea/
+*.iml
+
+# logs
+*.log
+npm-debug.log*
