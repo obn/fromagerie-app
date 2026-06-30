@@ -20,12 +20,28 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/commandes/:id (avec ses lignes)
+// GET /api/commandes/:id (avec ses lignes, reference produit + tarif client)
 router.get('/:id', async (req, res) => {
   try {
     const commande = await knex('commandes').where({ id: req.params.id }).first();
     if (!commande) return res.status(404).json({ error: 'Commande introuvable' });
-    const lignes = await knex('lignes_commande').where({ commande_id: req.params.id });
+
+    const lignes = await knex('lignes_commande as lc')
+      .where('lc.commande_id', req.params.id)
+      .leftJoin('produits as p', 'p.id', 'lc.produit_id')
+      .leftJoin('tarifs_client_produit as t', function () {
+        this.on('t.produit_id', '=', 'p.id').andOn('t.client_id', '=', knex.raw('?', [commande.client_id]));
+      })
+      .select(
+        'lc.*',
+        'p.gencod',
+        'p.designation as designation_officielle',
+        't.tarif_net',
+        't.tarif_general',
+        't.remise_pct',
+        't.unite_facturation as unite_tarif'
+      );
+
     res.json({ ...commande, lignes });
   } catch (err) {
     res.status(500).json({ error: err.message });

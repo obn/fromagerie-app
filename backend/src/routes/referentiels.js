@@ -71,3 +71,29 @@ router.patch('/codes-internes/:id', async (req, res) => {
 });
 
 module.exports = router;
+
+// GET /api/referentiels/clients
+router.get('/clients', async (req, res) => {
+  try {
+    res.json(await knex('clients').where({ actif: true }).orderBy('nom'));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/referentiels/interne (catalogue interne : familles + refs produits)
+router.get('/interne', async (req, res) => {
+  try {
+    const familles = await knex('familles_produits').orderBy('code');
+    const produits = await knex('ref_produits_internes as r')
+      .leftJoin('familles_produits as f', 'f.code', 'r.famille_code')
+      .select('r.*', 'f.libelle as famille_libelle')
+      .orderBy('r.famille_code')
+      .orderBy('r.code_interne');
+    res.json({ familles, produits });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/parametres (creation)

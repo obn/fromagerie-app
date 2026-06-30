@@ -4,7 +4,9 @@ const knex = require('../db/knex');
 const router = express.Router();
 
 // GET /api/carnet/:annee/:mois/:jour
-// Reconstruit la structure attendue par CarnetCommandes.vue : groupe par client.
+// Reconstruit la structure attendue par CarnetCommandes.vue : groupe par client,
+// avec pour chaque ligne la reference produit (gencod) et le tarif propre a ce client
+// (utile pour aider la saisie/verification au moment de la preparation).
 router.get('/:annee/:mois/:jour', async (req, res) => {
   try {
     const { annee, mois, jour } = req.params;
@@ -17,7 +19,21 @@ router.get('/:annee/:mois/:jour', async (req, res) => {
 
     const result = [];
     for (const commande of commandes) {
-      const lignes = await knex('lignes_commande').where({ commande_id: commande.id });
+      const lignes = await knex('lignes_commande as lc')
+        .where('lc.commande_id', commande.id)
+        .leftJoin('produits as p', 'p.id', 'lc.produit_id')
+        .leftJoin('tarifs_client_produit as t', function () {
+          this.on('t.produit_id', '=', 'p.id').andOn('t.client_id', '=', knex.raw('?', [commande.client_id]));
+        })
+        .select(
+          'lc.*',
+          'p.gencod',
+          'p.designation as designation_officielle',
+          't.tarif_net',
+          't.tarif_general',
+          't.remise_pct',
+          't.unite_facturation as unite_tarif'
+        );
       result.push({ ...commande, lignes });
     }
 

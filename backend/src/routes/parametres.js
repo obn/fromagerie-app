@@ -30,3 +30,13 @@ router.delete('/:id', async (req, res) => {
 });
 
 module.exports = router;
+
+router.post('/', async (req, res) => {
+  try {
+    const [id] = await knex('parametres').insert(req.body);
+    const nouveau = await knex('parametres').where({ id }).first();
+    res.status(201).json(nouveau);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
