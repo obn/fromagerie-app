@@ -2,6 +2,10 @@ const express = require('express');
 const knex = require('../db/knex');
 const router = express.Router();
 
+const CHAMPS_SYSTEME = ["id", "created_at", "updated_at", "client_nom"];
+function nettoyer(body) { const b = { ...body }; CHAMPS_SYSTEME.forEach(c => delete b[c]); return b; }
+
+
 // GET /api/commandes?annee=2026&mois=06
 router.get('/', async (req, res) => {
   try {
@@ -17,7 +21,7 @@ router.get('/', async (req, res) => {
 // POST /api/commandes
 router.post('/', async (req, res) => {
   try {
-    const [id] = await knex('commandes').insert(req.body);
+    const [id] = await knex('commandes').insert(nettoyer(req.body));
     res.status(201).json(await knex('commandes').where({ id }).first());
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -41,7 +45,7 @@ router.get('/:id', async (req, res) => {
 
 // PATCH /api/commandes/:id
 router.patch('/:id', async (req, res) => {
-  try { await knex('commandes').where({ id: req.params.id }).update(req.body); res.json({ ok: true }); }
+  try { await knex('commandes').where({ id: req.params.id }).update(nettoyer(req.body)); res.json({ ok: true }); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -55,14 +59,14 @@ router.delete('/:id', async (req, res) => {
 // POST /api/commandes/:id/lignes
 router.post('/:id/lignes', async (req, res) => {
   try {
-    const [lid] = await knex('lignes_commande').insert({ ...req.body, commande_id: req.params.id });
+    const [lid] = await knex('lignes_commande').insert({ ...nettoyer(req.body), commande_id: req.params.id });
     res.status(201).json(await knex('lignes_commande').where({ id: lid }).first());
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // PATCH /api/commandes/:id/lignes/:lid
 router.patch('/:id/lignes/:lid', async (req, res) => {
-  try { await knex('lignes_commande').where({ id: req.params.lid }).update(req.body); res.json({ ok: true }); }
+  try { await knex('lignes_commande').where({ id: req.params.lid }).update(nettoyer(req.body)); res.json({ ok: true }); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
