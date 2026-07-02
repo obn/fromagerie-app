@@ -3,7 +3,6 @@ node_modules/
 .env.local
 
 # build frontend (genere a chaque deploiement, pas versionne)
-backend/src/public/
 frontend/dist/
 
 # IDE
