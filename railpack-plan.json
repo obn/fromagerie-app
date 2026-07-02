@@ -1,4 +1,0 @@
-{
-  "providers": ["node"],
-  "startCommand": "node backend/src/server.js"
-}
