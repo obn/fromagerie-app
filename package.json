@@ -1,0 +1,11 @@
+{
+  "name": "fromagerie-app",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build && cd ../backend && npm install",
+    "start": "node backend/src/server.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
