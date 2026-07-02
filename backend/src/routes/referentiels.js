@@ -1,99 +1,139 @@
 const express = require('express');
 const knex = require('../db/knex');
-
 const router = express.Router();
 
-// GET /api/referentiels/produits
+// ─── CLIENTS ────────────────────────────────────────────────────────────────
+router.get('/clients', async (req, res) => {
+  try { res.json(await knex('clients').orderBy('nom')); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.post('/clients', async (req, res) => {
+  try {
+    const [id] = await knex('clients').insert(req.body);
+    res.status(201).json(await knex('clients').where({ id }).first());
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.patch('/clients/:id', async (req, res) => {
+  try { await knex('clients').where({ id: req.params.id }).update(req.body); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.delete('/clients/:id', async (req, res) => {
+  try { await knex('clients').where({ id: req.params.id }).del(); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── PRODUITS ────────────────────────────────────────────────────────────────
 router.get('/produits', async (req, res) => {
-  try {
-    res.json(await knex('produits').orderBy('designation'));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  try { res.json(await knex('produits').orderBy('designation')); }
+  catch (e) { res.status(500).json({ error: e.message }); }
 });
-
-// PATCH /api/referentiels/produits/:id
+router.post('/produits', async (req, res) => {
+  try {
+    const [id] = await knex('produits').insert(req.body);
+    res.status(201).json(await knex('produits').where({ id }).first());
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 router.patch('/produits/:id', async (req, res) => {
-  try {
-    await knex('produits').where({ id: req.params.id }).update(req.body);
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  try { await knex('produits').where({ id: req.params.id }).update(req.body); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
 });
-
-// DELETE /api/referentiels/produits/:id
 router.delete('/produits/:id', async (req, res) => {
-  try {
-    await knex('produits').where({ id: req.params.id }).del();
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  try { await knex('produits').where({ id: req.params.id }).del(); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// GET /api/referentiels/tarifs?client_id=1
+// ─── TARIFS CLIENT/PRODUIT ───────────────────────────────────────────────────
 router.get('/tarifs', async (req, res) => {
   try {
-    let query = knex('tarifs_client_produit')
-      .join('produits', 'produits.id', 'tarifs_client_produit.produit_id')
-      .join('clients', 'clients.id', 'tarifs_client_produit.client_id')
-      .select('tarifs_client_produit.*', 'produits.designation', 'clients.nom as client_nom');
-    if (req.query.client_id) query = query.where('tarifs_client_produit.client_id', req.query.client_id);
-    res.json(await query);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    let q = knex('tarifs_client_produit as t')
+      .join('produits as p', 'p.id', 't.produit_id')
+      .join('clients as c', 'c.id', 't.client_id')
+      .select('t.*', 'p.designation', 'p.gencod', 'c.nom as client_nom')
+      .orderBy('c.nom').orderBy('p.designation');
+    if (req.query.client_id) q = q.where('t.client_id', req.query.client_id);
+    res.json(await q);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.post('/tarifs', async (req, res) => {
+  try {
+    const [id] = await knex('tarifs_client_produit').insert(req.body);
+    res.status(201).json(await knex('tarifs_client_produit').where({ id }).first());
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.patch('/tarifs/:id', async (req, res) => {
+  try { await knex('tarifs_client_produit').where({ id: req.params.id }).update(req.body); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.delete('/tarifs/:id', async (req, res) => {
+  try { await knex('tarifs_client_produit').where({ id: req.params.id }).del(); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// GET /api/referentiels/codes-internes?client_id=1
+// ─── CODES INTERNES ──────────────────────────────────────────────────────────
 router.get('/codes-internes', async (req, res) => {
   try {
-    let query = knex('codes_internes').leftJoin('produits', 'produits.id', 'codes_internes.produit_id').select(
-      'codes_internes.*',
-      'produits.designation'
-    );
-    if (req.query.client_id) query = query.where('codes_internes.client_id', req.query.client_id);
-    res.json(await query);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    let q = knex('codes_internes as ci')
+      .join('clients as c', 'c.id', 'ci.client_id')
+      .leftJoin('produits as p', 'p.id', 'ci.produit_id')
+      .select('ci.*', 'c.nom as client_nom', 'p.designation', 'p.gencod')
+      .orderBy('c.nom').orderBy('ci.code_interne');
+    if (req.query.client_id) q = q.where('ci.client_id', req.query.client_id);
+    res.json(await q);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
-// PATCH /api/referentiels/codes-internes/:id (resolution manuelle vers un produit)
+router.post('/codes-internes', async (req, res) => {
+  try {
+    const [id] = await knex('codes_internes').insert(req.body);
+    res.status(201).json(await knex('codes_internes').where({ id }).first());
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 router.patch('/codes-internes/:id', async (req, res) => {
-  try {
-    await knex('codes_internes').where({ id: req.params.id }).update(req.body);
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  try { await knex('codes_internes').where({ id: req.params.id }).update(req.body); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.delete('/codes-internes/:id', async (req, res) => {
+  try { await knex('codes_internes').where({ id: req.params.id }).del(); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-module.exports = router;
-
-// GET /api/referentiels/clients
-router.get('/clients', async (req, res) => {
-  try {
-    res.json(await knex('clients').where({ actif: true }).orderBy('nom'));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /api/referentiels/interne (catalogue interne : familles + refs produits)
+// ─── CATALOGUE INTERNE ───────────────────────────────────────────────────────
 router.get('/interne', async (req, res) => {
   try {
     const familles = await knex('familles_produits').orderBy('code');
     const produits = await knex('ref_produits_internes as r')
       .leftJoin('familles_produits as f', 'f.code', 'r.famille_code')
       .select('r.*', 'f.libelle as famille_libelle')
-      .orderBy('r.famille_code')
-      .orderBy('r.code_interne');
+      .orderBy('r.famille_code').orderBy('r.code_interne');
     res.json({ familles, produits });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.post('/interne/familles', async (req, res) => {
+  try {
+    await knex('familles_produits').insert(req.body);
+    res.status(201).json(await knex('familles_produits').where({ code: req.body.code }).first());
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.patch('/interne/familles/:code', async (req, res) => {
+  try { await knex('familles_produits').where({ code: req.params.code }).update(req.body); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.delete('/interne/familles/:code', async (req, res) => {
+  try { await knex('familles_produits').where({ code: req.params.code }).del(); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.post('/interne/produits', async (req, res) => {
+  try {
+    await knex('ref_produits_internes').insert(req.body);
+    res.status(201).json(await knex('ref_produits_internes').where({ code_interne: req.body.code_interne }).first());
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.patch('/interne/produits/:code', async (req, res) => {
+  try { await knex('ref_produits_internes').where({ code_interne: req.params.code }).update(req.body); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.delete('/interne/produits/:code', async (req, res) => {
+  try { await knex('ref_produits_internes').where({ code_interne: req.params.code }).del(); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/parametres (creation)
+module.exports = router;
