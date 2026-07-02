@@ -1,235 +1,285 @@
 <template>
   <div class="page">
     <div class="page-header">
-      <div>
-        <h1>Commandes</h1>
-        <p class="subtitle">Historique par date de livraison</p>
-      </div>
-      <div class="filters">
-        <select v-model="filtreAnnee" @change="charger">
+      <div><h1>Commandes</h1><p class="sub">Historique par date de livraison</p></div>
+      <div class="toolbar">
+        <select v-model="filtres.annee" @change="charger" class="sel">
           <option value="">Toutes années</option>
           <option v-for="a in annees" :key="a" :value="a">{{ a }}</option>
         </select>
-        <select v-model="filtreMois" @change="charger">
+        <select v-model="filtres.mois" @change="charger" class="sel">
           <option value="">Tous mois</option>
-          <option v-for="m in mois" :key="m.val" :value="m.val">{{ m.label }}</option>
+          <option v-for="m in mois" :key="m.v" :value="m.v">{{ m.l }}</option>
         </select>
+        <button class="btn primary" @click="ouvrir()">+ Ajouter</button>
       </div>
     </div>
 
     <div v-if="chargement" class="etat">Chargement…</div>
-    <div v-else-if="erreur" class="etat erreur">{{ erreur }}</div>
-    <div v-else-if="commandes.length === 0" class="etat vide">Aucune commande pour cette période.</div>
+    <div v-else-if="!commandes.length" class="etat">Aucune commande pour cette période.</div>
 
     <div v-else class="table-wrap">
       <table>
-        <thead>
-          <tr>
-            <th>N° commande</th>
-            <th>Client</th>
-            <th>Commande le</th>
-            <th>Livraison</th>
-            <th>Statut</th>
-            <th>Source</th>
-            <th></th>
-          </tr>
-        </thead>
+        <thead><tr><th>N° commande</th><th>Client</th><th>Commande le</th><th>Livraison</th><th>Statut</th><th>Source</th><th></th></tr></thead>
         <tbody>
-          <tr v-for="c in commandes" :key="c.id" :class="['row', 'statut-' + c.statut]">
-            <td><span class="num">{{ c.numero_commande }}</span></td>
-            <td>{{ c.client_nom }}</td>
-            <td>{{ formatDate(c.date_commande) }}</td>
-            <td><strong>{{ formatDate(c.date_livraison) }}</strong></td>
+          <tr v-for="c in commandes" :key="c.id">
+            <td class="mono">{{ c.numero_commande }}</td>
+            <td><strong>{{ c.client_nom }}</strong></td>
+            <td>{{ fmtDate(c.date_commande) }}</td>
+            <td><strong>{{ fmtDate(c.date_livraison) }}</strong></td>
             <td>
-              <select class="statut-select" :value="c.statut" @change="changerStatut(c, $event.target.value)">
+              <select class="statut-sel" :value="c.statut" @change="patchStatut(c, $event.target.value)">
                 <option value="brouillon">Brouillon</option>
                 <option value="a_verifier">À vérifier</option>
                 <option value="validee">Validée</option>
                 <option value="archivee">Archivée</option>
               </select>
             </td>
-            <td><span class="badge-source" :class="c.source">{{ c.source }}</span></td>
-            <td class="actions">
-              <button class="btn-icon" title="Voir les lignes" @click="voirLignes(c)">👁</button>
-              <button class="btn-icon danger" title="Supprimer" @click="supprimer(c)">✕</button>
+            <td><span :class="['badge-src', c.source]">{{ c.source }}</span></td>
+            <td class="act">
+              <button class="btn-ico" title="Lignes" @click="voirLignes(c)">👁</button>
+              <button class="btn-ico" title="Modifier" @click="ouvrir(c)">✏️</button>
+              <button class="btn-ico rouge" title="Supprimer" @click="suppr.item = c; suppr.visible = true">✕</button>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Panneau latéral : lignes de commande -->
-    <div v-if="commandeOuverte" class="panel-overlay" @click.self="commandeOuverte = null">
+    <!-- Panneau lignes -->
+    <div v-if="panel.visible" class="panel-overlay" @click.self="panel.visible = false">
       <div class="panel">
-        <div class="panel-header">
-          <h2>{{ commandeOuverte.client_nom }} — N° {{ commandeOuverte.numero_commande }}</h2>
-          <button class="btn-icon" @click="commandeOuverte = null">✕</button>
+        <div class="panel-head">
+          <h2>{{ panel.commande?.client_nom }} — N° {{ panel.commande?.numero_commande }}</h2>
+          <div style="display:flex;gap:8px">
+            <button class="btn primary small" @click="ajouterLigne">+ Ligne</button>
+            <button class="btn-ico" @click="panel.visible = false">✕</button>
+          </div>
         </div>
-        <div v-if="lignesChargement" class="etat">Chargement…</div>
-        <table v-else class="table-lignes">
-          <thead>
-            <tr><th>Qté</th><th>Désignation</th><th>Réf.</th><th>Prix</th><th>Certitude</th></tr>
-          </thead>
+        <div v-if="panel.chargement" class="etat">Chargement…</div>
+        <table v-else class="tbl-lignes">
+          <thead><tr><th>Qté</th><th>Désignation</th><th>Réf. interne</th><th>Gencod</th><th>Prix</th><th>Certitude</th><th></th></tr></thead>
           <tbody>
-            <tr v-for="l in lignes" :key="l.id" :class="'cert-' + l.certitude">
-              <td>{{ l.quantite }}</td>
+            <tr v-for="l in panel.lignes" :key="l.id" :class="'cert-' + l.certitude">
+              <td class="num">{{ l.quantite }}</td>
               <td>{{ l.designation_brute }}</td>
+              <td class="mono">{{ l.code_interne || '—' }}</td>
               <td class="mono">{{ l.gencod || '—' }}</td>
-              <td>{{ l.tarif_net ? Number(l.tarif_net).toFixed(2) + ' €' : '—' }}</td>
-              <td><span class="badge-cert" :class="l.certitude">{{ l.certitude }}</span></td>
+              <td class="num prix">{{ l.tarif_net ? Number(l.tarif_net).toFixed(2) + ' €' : '—' }}</td>
+              <td><span :class="['badge-cert', l.certitude]">{{ l.certitude }}</span></td>
+              <td class="act">
+                <button class="btn-ico" @click="editerLigne(l)">✏️</button>
+                <button class="btn-ico rouge" @click="supprimerLigne(l)">✕</button>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <div v-if="confirm" class="confirm-overlay" @click.self="confirm = null">
-      <div class="confirm-box">
-        <p>Supprimer la commande <strong>{{ confirm.numero_commande }}</strong> ({{ confirm.client_nom }}) ?</p>
-        <div class="confirm-actions">
-          <button class="btn secondary" @click="confirm = null">Annuler</button>
-          <button class="btn danger" @click="confirmerSuppression">Supprimer</button>
-        </div>
-      </div>
-    </div>
+    <!-- Modal commande -->
+    <Modal v-if="modal.visible" :titre="modal.item ? 'Modifier la commande' : 'Nouvelle commande'"
+      @close="modal.visible = false" @confirm="sauvegarder">
+      <label>Client
+        <select v-model="form.client_id" class="inp">
+          <option v-for="c in clients" :key="c.id" :value="c.id">{{ c.nom }}</option>
+        </select>
+      </label>
+      <label>N° commande <input v-model="form.numero_commande" class="inp" /></label>
+      <label>Date commande <input v-model="form.date_commande" type="date" class="inp" /></label>
+      <label>Date livraison <input v-model="form.date_livraison" type="date" class="inp" /></label>
+      <label>Statut
+        <select v-model="form.statut" class="inp">
+          <option value="brouillon">Brouillon</option>
+          <option value="a_verifier">À vérifier</option>
+          <option value="validee">Validée</option>
+          <option value="archivee">Archivée</option>
+        </select>
+      </label>
+      <label>Source
+        <select v-model="form.source" class="inp">
+          <option value="manuel">Manuel</option>
+          <option value="gmail">Gmail</option>
+        </select>
+      </label>
+    </Modal>
+
+    <!-- Modal ligne -->
+    <Modal v-if="modalLigne.visible" :titre="modalLigne.item ? 'Modifier la ligne' : 'Nouvelle ligne'"
+      @close="modalLigne.visible = false" @confirm="sauvegarderLigne">
+      <label>Désignation <input v-model="formLigne.designation_brute" class="inp" /></label>
+      <label>Quantité <input v-model.number="formLigne.quantite" type="number" class="inp" /></label>
+      <label>Unité <input v-model="formLigne.unite" class="inp" /></label>
+      <label>Code interne <input v-model="formLigne.code_interne" class="inp" /></label>
+      <label>Certitude
+        <select v-model="formLigne.certitude" class="inp">
+          <option value="haute">Haute</option>
+          <option value="a_verifier">À vérifier</option>
+          <option value="non_fiable">Non fiable</option>
+        </select>
+      </label>
+    </Modal>
+
+    <ConfirmSuppr v-if="suppr.visible"
+      :message="`Supprimer la commande N° ${suppr.item?.numero_commande} ?`"
+      @annuler="suppr.visible = false"
+      @confirmer="confirmerSuppr" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { api } from '../services/api';
+import Modal from '../components/Modal.vue';
+import ConfirmSuppr from '../components/ConfirmSuppr.vue';
 
 const commandes = ref([]);
+const clients = ref([]);
 const chargement = ref(true);
-const erreur = ref(null);
-const filtreAnnee = ref('');
-const filtreMois = ref('');
-const commandeOuverte = ref(null);
-const lignes = ref([]);
-const lignesChargement = ref(false);
-const confirm = ref(null);
+const filtres = reactive({ annee: new Date().getFullYear(), mois: '' });
+const modal = reactive({ visible: false, item: null });
+const form = ref({});
+const suppr = reactive({ visible: false, item: null });
+const panel = reactive({ visible: false, commande: null, lignes: [], chargement: false });
+const modalLigne = reactive({ visible: false, item: null });
+const formLigne = ref({});
 
 const annees = [2024, 2025, 2026, 2027];
 const mois = [
-  { val: '01', label: 'Janvier' }, { val: '02', label: 'Février' },
-  { val: '03', label: 'Mars' }, { val: '04', label: 'Avril' },
-  { val: '05', label: 'Mai' }, { val: '06', label: 'Juin' },
-  { val: '07', label: 'Juillet' }, { val: '08', label: 'Août' },
-  { val: '09', label: 'Septembre' }, { val: '10', label: 'Octobre' },
-  { val: '11', label: 'Novembre' }, { val: '12', label: 'Décembre' },
+  { v: '01', l: 'Janvier' }, { v: '02', l: 'Février' }, { v: '03', l: 'Mars' },
+  { v: '04', l: 'Avril' }, { v: '05', l: 'Mai' }, { v: '06', l: 'Juin' },
+  { v: '07', l: 'Juillet' }, { v: '08', l: 'Août' }, { v: '09', l: 'Septembre' },
+  { v: '10', l: 'Octobre' }, { v: '11', l: 'Novembre' }, { v: '12', l: 'Décembre' },
 ];
 
-function formatDate(d) {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('fr-FR');
-}
+const fmtDate = d => d ? new Date(d).toLocaleDateString('fr-FR') : '—';
 
 async function charger() {
   chargement.value = true;
-  erreur.value = null;
-  try {
-    const params = new URLSearchParams();
-    if (filtreAnnee.value) params.set('annee', filtreAnnee.value);
-    if (filtreMois.value) params.set('mois', filtreMois.value);
-    commandes.value = await api.get('/commandes?' + params.toString());
-  } catch (e) {
-    erreur.value = e.message;
-  } finally {
-    chargement.value = false;
-  }
+  const p = new URLSearchParams();
+  if (filtres.annee) p.set('annee', filtres.annee);
+  if (filtres.mois)  p.set('mois', filtres.mois);
+  commandes.value = await api.get('/commandes?' + p);
+  chargement.value = false;
 }
 
 async function voirLignes(c) {
-  commandeOuverte.value = c;
-  lignesChargement.value = true;
-  try {
-    const data = await api.get('/commandes/' + c.id);
-    lignes.value = data.lignes || [];
-  } catch (e) {
-    lignes.value = [];
-  } finally {
-    lignesChargement.value = false;
-  }
+  panel.commande = c; panel.visible = true; panel.chargement = true;
+  const data = await api.get('/commandes/' + c.id);
+  panel.lignes = data.lignes || [];
+  panel.chargement = false;
 }
 
-async function changerStatut(c, statut) {
-  try {
-    await api.patch('/commandes/' + c.id, { statut });
-    c.statut = statut;
-  } catch (e) {
-    alert('Erreur : ' + e.message);
-  }
+function ouvrir(item = null) {
+  modal.item = item;
+  form.value = item
+    ? { ...item }
+    : { client_id: '', numero_commande: '', date_commande: '', date_livraison: '', statut: 'brouillon', source: 'manuel' };
+  modal.visible = true;
 }
 
-function supprimer(c) { confirm.value = c; }
-
-async function confirmerSuppression() {
-  try {
-    await api.delete('/commandes/' + confirm.value.id);
-    commandes.value = commandes.value.filter(c => c.id !== confirm.value.id);
-    confirm.value = null;
-  } catch (e) {
-    alert('Erreur : ' + e.message);
+async function sauvegarder() {
+  if (modal.item) {
+    await api.patch('/commandes/' + modal.item.id, form.value);
+    Object.assign(modal.item, form.value);
+    const client = clients.value.find(c => c.id == form.value.client_id);
+    if (client) modal.item.client_nom = client.nom;
+  } else {
+    const n = await api.post('/commandes', form.value);
+    const client = clients.value.find(c => c.id == form.value.client_id);
+    commandes.value.unshift({ ...n, client_nom: client?.nom || '' });
   }
+  modal.visible = false;
 }
 
-onMounted(charger);
+async function patchStatut(c, statut) {
+  await api.patch('/commandes/' + c.id, { statut }); c.statut = statut;
+}
+
+async function confirmerSuppr() {
+  await api.delete('/commandes/' + suppr.item.id);
+  commandes.value = commandes.value.filter(c => c.id !== suppr.item.id);
+  suppr.visible = false;
+}
+
+function ajouterLigne() {
+  modalLigne.item = null;
+  formLigne.value = { designation_brute: '', quantite: '', unite: '', code_interne: '', certitude: 'a_verifier' };
+  modalLigne.visible = true;
+}
+
+function editerLigne(l) {
+  modalLigne.item = l;
+  formLigne.value = { ...l };
+  modalLigne.visible = true;
+}
+
+async function sauvegarderLigne() {
+  const cid = panel.commande.id;
+  if (modalLigne.item) {
+    await api.patch('/commandes/' + cid + '/lignes/' + modalLigne.item.id, formLigne.value);
+    Object.assign(modalLigne.item, formLigne.value);
+  } else {
+    const n = await api.post('/commandes/' + cid + '/lignes', formLigne.value);
+    panel.lignes.push(n);
+  }
+  modalLigne.visible = false;
+}
+
+async function supprimerLigne(l) {
+  if (!confirm('Supprimer cette ligne ?')) return;
+  await api.delete('/commandes/' + panel.commande.id + '/lignes/' + l.id);
+  panel.lignes = panel.lignes.filter(x => x.id !== l.id);
+}
+
+onMounted(async () => {
+  clients.value = await api.get('/referentiels/clients');
+  await charger();
+});
 </script>
 
 <style scoped>
-.page { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+.page { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
 h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
-.subtitle { margin: 2px 0 0; color: #7a8898; font-size: 0.85rem; }
-.filters { display: flex; gap: 8px; }
-select { padding: 7px 10px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.85rem; background: white; }
-
+.sub { margin: 2px 0 0; color: #7a8898; font-size: 0.85rem; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.sel { padding: 7px 10px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.85rem; background: white; }
 .etat { padding: 40px; text-align: center; color: #7a8898; }
-.erreur { color: #b3261e; }
-.vide { font-style: italic; }
-
-.table-wrap { background: white; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); overflow: hidden; }
-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.table-wrap { background: white; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); overflow: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.855rem; }
 thead { background: #f5f2e8; }
-th { padding: 10px 14px; text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #5a6070; font-weight: 600; border-bottom: 2px solid #e8e3d5; }
-td { padding: 10px 14px; border-bottom: 1px solid #f0ece0; vertical-align: middle; }
+th { padding: 9px 14px; text-align: left; font-size: 0.71rem; text-transform: uppercase; letter-spacing: 0.05em; color: #5a6070; font-weight: 600; border-bottom: 2px solid #e8e3d5; white-space: nowrap; }
+td { padding: 9px 14px; border-bottom: 1px solid #f0ece0; vertical-align: middle; }
 tr:last-child td { border-bottom: none; }
-tr.row:hover { background: #faf8f2; }
-
-.num { font-family: monospace; font-size: 0.92rem; background: #f0ece0; padding: 2px 6px; border-radius: 4px; }
+tr:hover { background: #faf8f2; }
 .mono { font-family: monospace; font-size: 0.82rem; color: #4a7a5a; }
-
-.statut-select { border: none; background: transparent; font-size: 0.82rem; cursor: pointer; color: #1a2a4a; padding: 3px 4px; border-radius: 4px; }
-.statut-select:hover { background: #f0ece0; }
-
-.badge-source { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
-.badge-source.gmail { background: #e8f0fe; color: #1a56b0; }
-.badge-source.manuel { background: #f0ece0; color: #5a4a30; }
-
-.actions { display: flex; gap: 6px; }
-.btn-icon { border: none; background: transparent; cursor: pointer; font-size: 0.9rem; padding: 4px 8px; border-radius: 4px; color: #5a6070; }
-.btn-icon:hover { background: #f0ece0; }
-.btn-icon.danger:hover { background: #fde8e8; color: #b3261e; }
-
-/* panel lignes */
-.panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 100; display: flex; justify-content: flex-end; }
-.panel { width: 580px; max-width: 95vw; background: white; height: 100%; overflow-y: auto; box-shadow: -4px 0 20px rgba(0,0,0,0.15); }
-.panel-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #e8e3d5; position: sticky; top: 0; background: white; }
-.panel-header h2 { margin: 0; font-size: 1rem; color: #1a2a4a; }
-.table-lignes { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-.table-lignes th { padding: 8px 14px; text-align: left; font-size: 0.72rem; text-transform: uppercase; color: #7a8898; border-bottom: 2px solid #e8e3d5; }
-.table-lignes td { padding: 9px 14px; border-bottom: 1px solid #f0ece0; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.prix { font-weight: 700; color: #1a2a4a; }
+.act { display: flex; gap: 4px; }
+.btn-ico { border: none; background: transparent; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 0.88rem; }
+.btn-ico:hover { background: #f0ece0; }
+.btn-ico.rouge:hover { background: #fde8e8; color: #b3261e; }
+.btn { padding: 8px 18px; border-radius: 6px; border: none; font-size: 0.85rem; cursor: pointer; font-weight: 600; }
+.btn.primary { background: #2f6f4f; color: white; }
+.btn.small { padding: 5px 12px; font-size: 0.8rem; }
+.statut-sel { border: none; background: transparent; font-size: 0.82rem; cursor: pointer; color: #1a2a4a; padding: 3px 4px; border-radius: 4px; }
+.statut-sel:hover { background: #f0ece0; }
+.badge-src { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.badge-src.gmail { background: #e8f0fe; color: #1a56b0; }
+.badge-src.manuel { background: #f0ece0; color: #5a4a30; }
 .badge-cert { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
 .badge-cert.haute { background: #eef6ec; color: #2f6f4f; }
 .badge-cert.a_verifier { background: #fff3a0; color: #7a6000; }
 .badge-cert.non_fiable { background: #fde8e8; color: #b3261e; }
-
-/* confirm */
-.confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; display: flex; align-items: center; justify-content: center; }
-.confirm-box { background: white; border-radius: 10px; padding: 24px; max-width: 400px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
-.confirm-box p { margin: 0 0 20px; line-height: 1.5; }
-.confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
-.btn { padding: 8px 18px; border-radius: 6px; border: none; font-size: 0.88rem; cursor: pointer; font-weight: 600; }
-.btn.secondary { background: #f0ece0; color: #1a2a4a; }
-.btn.danger { background: #b3261e; color: white; }
+.panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 100; display: flex; justify-content: flex-end; }
+.panel { width: 640px; max-width: 95vw; background: white; height: 100%; overflow-y: auto; box-shadow: -4px 0 20px rgba(0,0,0,0.15); }
+.panel-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #e8e3d5; position: sticky; top: 0; background: white; z-index: 1; }
+.panel-head h2 { margin: 0; font-size: 1rem; color: #1a2a4a; }
+.tbl-lignes { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.tbl-lignes th { padding: 8px 14px; text-align: left; font-size: 0.71rem; text-transform: uppercase; color: #7a8898; border-bottom: 2px solid #e8e3d5; }
+.tbl-lignes td { padding: 9px 14px; border-bottom: 1px solid #f0ece0; }
+label { display: flex; flex-direction: column; gap: 5px; font-size: 0.85rem; font-weight: 600; color: #3a4a5a; }
+.inp { padding: 8px 10px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.875rem; width: 100%; box-sizing: border-box; }
+.inp:focus { outline: none; border-color: #2f6f4f; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
 </style>

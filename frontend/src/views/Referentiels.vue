@@ -3,243 +3,379 @@
     <div class="page-header">
       <h1>Référentiels</h1>
       <div class="tabs">
-        <button :class="['tab', { active: onglet === 'produits' }]" @click="onglet = 'produits'; chargerProduits()">Produits ({{ produits.length }})</button>
-        <button :class="['tab', { active: onglet === 'tarifs' }]" @click="onglet = 'tarifs'; chargerTarifs()">Tarifs clients</button>
-        <button :class="['tab', { active: onglet === 'interne' }]" @click="onglet = 'interne'; chargerInterne()">Catalogue interne</button>
+        <button v-for="t in onglets" :key="t.id"
+          :class="['tab', { active: onglet === t.id }]"
+          @click="changerOnglet(t.id)">
+          {{ t.label }}
+          <span v-if="t.count !== undefined" class="count">{{ t.count }}</span>
+        </button>
       </div>
     </div>
 
-    <!-- PRODUITS -->
-    <div v-if="onglet === 'produits'">
+    <!-- ── CLIENTS ── -->
+    <section v-if="onglet === 'clients'">
       <div class="toolbar">
-        <input v-model="rechercheProduit" placeholder="Rechercher un produit…" class="search" />
+        <input v-model="q.clients" placeholder="Rechercher…" class="search" />
+        <button class="btn primary" @click="ouvrir('clients')">+ Ajouter</button>
       </div>
       <div class="table-wrap">
         <table>
-          <thead>
-            <tr><th>Gencod</th><th>Désignation</th><th>Unité</th><th>DLUO (j)</th><th>Actif</th><th></th></tr>
-          </thead>
+          <thead><tr><th>Nom</th><th>Jour fixe livraison</th><th>Actif</th><th></th></tr></thead>
           <tbody>
-            <tr v-for="p in produitsFiltres" :key="p.id">
-              <td class="mono">{{ p.gencod }}</td>
-              <td>
-                <span v-if="editId !== p.id">{{ p.designation }}</span>
-                <input v-else v-model="editData.designation" class="edit-input" />
-              </td>
-              <td>
-                <span v-if="editId !== p.id">{{ p.unite }}</span>
-                <input v-else v-model="editData.unite" class="edit-input small" />
-              </td>
-              <td>
-                <span v-if="editId !== p.id">{{ p.dluo_jours ?? '—' }}</span>
-                <input v-else v-model.number="editData.dluo_jours" type="number" class="edit-input small" />
-              </td>
-              <td>
-                <span class="badge-actif" :class="{ actif: p.actif, inactif: !p.actif }">
-                  {{ p.actif ? 'Actif' : 'Inactif' }}
-                </span>
-              </td>
-              <td class="actions">
-                <template v-if="editId !== p.id">
-                  <button class="btn-icon" @click="editer(p)">✏️</button>
-                  <button class="btn-icon danger" @click="confirm = { type: 'produit', item: p }">✕</button>
-                </template>
-                <template v-else>
-                  <button class="btn-icon ok" @click="sauvegarderProduit(p)">✓</button>
-                  <button class="btn-icon" @click="editId = null">✕</button>
-                </template>
+            <tr v-for="c in filtres.clients" :key="c.id">
+              <td><strong>{{ c.nom }}</strong></td>
+              <td>{{ c.jour_fixe_livraison || '—' }}</td>
+              <td><span :class="['badge', c.actif ? 'vert' : 'gris']">{{ c.actif ? 'Actif' : 'Inactif' }}</span></td>
+              <td class="act">
+                <button class="btn-ico" @click="ouvrir('clients', c)">✏️</button>
+                <button class="btn-ico rouge" @click="demanderSuppr('clients', c, c.nom)">✕</button>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
 
-    <!-- TARIFS -->
-    <div v-if="onglet === 'tarifs'">
+    <!-- ── PRODUITS ── -->
+    <section v-if="onglet === 'produits'">
       <div class="toolbar">
-        <select v-model="filtreClient" @change="chargerTarifs" class="search">
-          <option value="">Tous les clients</option>
-          <option v-for="c in clients" :key="c.id" :value="c.id">{{ c.nom }}</option>
-        </select>
-        <input v-model="rechercheTarif" placeholder="Rechercher un produit…" class="search" />
+        <input v-model="q.produits" placeholder="Rechercher gencod ou désignation…" class="search" />
+        <button class="btn primary" @click="ouvrir('produits')">+ Ajouter</button>
       </div>
       <div class="table-wrap">
         <table>
-          <thead>
-            <tr><th>Client</th><th>Désignation</th><th>Gencod</th><th>PCB</th><th>Tarif général</th><th>Remise %</th><th>Tarif net</th><th>Unité</th></tr>
-          </thead>
+          <thead><tr><th>Gencod</th><th>Désignation</th><th>Unité</th><th>DLUO (j)</th><th>Actif</th><th></th></tr></thead>
           <tbody>
-            <tr v-for="t in tarifsFiltres" :key="t.id">
+            <tr v-for="p in filtres.produits" :key="p.id">
+              <td class="mono">{{ p.gencod }}</td>
+              <td>{{ p.designation }}</td>
+              <td>{{ p.unite || '—' }}</td>
+              <td class="num">{{ p.dluo_jours ?? '—' }}</td>
+              <td><span :class="['badge', p.actif ? 'vert' : 'gris']">{{ p.actif ? 'Actif' : 'Inactif' }}</span></td>
+              <td class="act">
+                <button class="btn-ico" @click="ouvrir('produits', p)">✏️</button>
+                <button class="btn-ico rouge" @click="demanderSuppr('produits', p, p.designation)">✕</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── TARIFS ── -->
+    <section v-if="onglet === 'tarifs'">
+      <div class="toolbar">
+        <select v-model="q.tarifClient" @change="chargerTarifs" class="search">
+          <option value="">Tous les clients</option>
+          <option v-for="c in data.clients" :key="c.id" :value="c.id">{{ c.nom }}</option>
+        </select>
+        <input v-model="q.tarifs" placeholder="Rechercher produit…" class="search" />
+        <button class="btn primary" @click="ouvrir('tarifs')">+ Ajouter</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Client</th><th>Désignation</th><th>Gencod</th><th>PCB</th><th>Tarif gén.</th><th>Remise %</th><th>Tarif net</th><th>Unité</th><th></th></tr></thead>
+          <tbody>
+            <tr v-for="t in filtres.tarifs" :key="t.id">
               <td>{{ t.client_nom }}</td>
               <td>{{ t.designation }}</td>
               <td class="mono">{{ t.gencod }}</td>
               <td class="num">{{ t.pcb ?? '—' }}</td>
-              <td class="num">{{ t.tarif_general ? Number(t.tarif_general).toFixed(2) + ' €' : '—' }}</td>
+              <td class="num">{{ fmt(t.tarif_general) }}</td>
               <td class="num">{{ t.remise_pct ? Number(t.remise_pct).toFixed(2) + ' %' : '—' }}</td>
-              <td class="num prix">{{ t.tarif_net ? Number(t.tarif_net).toFixed(2) + ' €' : '—' }}</td>
-              <td>{{ t.unite_facturation ?? '—' }}</td>
+              <td class="num prix">{{ fmt(t.tarif_net) }}</td>
+              <td>{{ t.unite_facturation || '—' }}</td>
+              <td class="act">
+                <button class="btn-ico" @click="ouvrir('tarifs', t)">✏️</button>
+                <button class="btn-ico rouge" @click="demanderSuppr('tarifs', t, t.designation + ' / ' + t.client_nom)">✕</button>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
 
-    <!-- CATALOGUE INTERNE -->
-    <div v-if="onglet === 'interne'">
+    <!-- ── CODES INTERNES ── -->
+    <section v-if="onglet === 'codes'">
       <div class="toolbar">
-        <select v-model="filtreFamille" class="search">
-          <option value="">Toutes les familles</option>
-          <option v-for="f in familles" :key="f.code" :value="f.code">{{ f.code }} — {{ f.libelle }}</option>
+        <select v-model="q.codesClient" @change="chargerCodes" class="search">
+          <option value="">Tous les clients</option>
+          <option v-for="c in data.clients" :key="c.id" :value="c.id">{{ c.nom }}</option>
         </select>
-        <input v-model="rechercheInterne" placeholder="Rechercher un code ou libellé…" class="search" />
+        <input v-model="q.codes" placeholder="Rechercher code ou produit…" class="search" />
+        <button class="btn primary" @click="ouvrir('codes')">+ Ajouter</button>
       </div>
       <div class="table-wrap">
         <table>
-          <thead>
-            <tr><th>Code interne</th><th>Libellé</th><th>Famille</th></tr>
-          </thead>
+          <thead><tr><th>Client</th><th>Code interne</th><th>Produit lié</th><th>Gencod</th><th></th></tr></thead>
           <tbody>
-            <tr v-for="r in interneFiltre" :key="r.code_interne">
-              <td class="mono">{{ r.code_interne }}</td>
-              <td>{{ r.libelle_produit }}</td>
-              <td><span class="badge-famille">{{ r.famille_code }} — {{ r.famille_libelle }}</span></td>
+            <tr v-for="c in filtres.codes" :key="c.id">
+              <td>{{ c.client_nom }}</td>
+              <td class="mono">{{ c.code_interne }}</td>
+              <td><span v-if="c.designation">{{ c.designation }}</span><span v-else class="muted">Non résolu</span></td>
+              <td class="mono">{{ c.gencod || '—' }}</td>
+              <td class="act">
+                <button class="btn-ico" @click="ouvrir('codes', c)">✏️</button>
+                <button class="btn-ico rouge" @click="demanderSuppr('codes', c, c.code_interne)">✕</button>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
 
-    <!-- Confirm suppression -->
-    <div v-if="confirm" class="confirm-overlay" @click.self="confirm = null">
-      <div class="confirm-box">
-        <p>Supprimer <strong>{{ confirm.item.designation || confirm.item.gencod }}</strong> ?</p>
-        <div class="confirm-actions">
-          <button class="btn secondary" @click="confirm = null">Annuler</button>
-          <button class="btn danger" @click="confirmerSuppression">Supprimer</button>
-        </div>
+    <!-- ── CATALOGUE INTERNE ── -->
+    <section v-if="onglet === 'interne'">
+      <div class="toolbar">
+        <select v-model="q.famille" class="search">
+          <option value="">Toutes les familles</option>
+          <option v-for="f in data.familles" :key="f.code" :value="f.code">{{ f.code }} — {{ f.libelle }}</option>
+        </select>
+        <input v-model="q.interne" placeholder="Code ou libellé…" class="search" />
+        <button class="btn primary" @click="ouvrir('interne')">+ Ajouter</button>
       </div>
-    </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Code interne</th><th>Libellé</th><th>Famille</th><th></th></tr></thead>
+          <tbody>
+            <tr v-for="r in filtres.interne" :key="r.code_interne">
+              <td class="mono">{{ r.code_interne }}</td>
+              <td>{{ r.libelle_produit }}</td>
+              <td><span class="badge gris">{{ r.famille_code }} — {{ r.famille_libelle }}</span></td>
+              <td class="act">
+                <button class="btn-ico" @click="ouvrir('interne', r)">✏️</button>
+                <button class="btn-ico rouge" @click="demanderSuppr('interne', r, r.code_interne)">✕</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── MODAL FORMULAIRE ── -->
+    <Modal v-if="modal.visible" :titre="modal.titre" @close="modal.visible = false" @confirm="sauvegarder">
+      <!-- Clients -->
+      <template v-if="modal.type === 'clients'">
+        <label>Nom <input v-model="form.nom" class="inp" /></label>
+        <label>Jour fixe livraison <input v-model="form.jour_fixe_livraison" placeholder="ex: jeudi" class="inp" /></label>
+        <label class="row-check"><input type="checkbox" v-model="form.actif" /> Actif</label>
+      </template>
+      <!-- Produits -->
+      <template v-if="modal.type === 'produits'">
+        <label>Gencod <input v-model="form.gencod" class="inp" :disabled="!!modal.item" /></label>
+        <label>Désignation <input v-model="form.designation" class="inp" /></label>
+        <label>Unité <input v-model="form.unite" placeholder="Kg, Pièce…" class="inp" /></label>
+        <label>DLUO (jours) <input v-model.number="form.dluo_jours" type="number" class="inp" /></label>
+        <label class="row-check"><input type="checkbox" v-model="form.actif" /> Actif</label>
+      </template>
+      <!-- Tarifs -->
+      <template v-if="modal.type === 'tarifs'">
+        <label>Client
+          <select v-model="form.client_id" class="inp">
+            <option v-for="c in data.clients" :key="c.id" :value="c.id">{{ c.nom }}</option>
+          </select>
+        </label>
+        <label>Produit
+          <select v-model="form.produit_id" class="inp">
+            <option v-for="p in data.produits" :key="p.id" :value="p.id">{{ p.designation }}</option>
+          </select>
+        </label>
+        <label>PCB <input v-model.number="form.pcb" type="number" class="inp" /></label>
+        <label>Tarif général <input v-model.number="form.tarif_general" type="number" step="0.01" class="inp" /></label>
+        <label>Remise % <input v-model.number="form.remise_pct" type="number" step="0.01" class="inp" /></label>
+        <label>Tarif net <input v-model.number="form.tarif_net" type="number" step="0.01" class="inp" /></label>
+        <label>Unité facturation <input v-model="form.unite_facturation" placeholder="Kg, Pièce…" class="inp" /></label>
+      </template>
+      <!-- Codes internes -->
+      <template v-if="modal.type === 'codes'">
+        <label>Client
+          <select v-model="form.client_id" class="inp">
+            <option v-for="c in data.clients" :key="c.id" :value="c.id">{{ c.nom }}</option>
+          </select>
+        </label>
+        <label>Code interne <input v-model="form.code_interne" class="inp" :disabled="!!modal.item" /></label>
+        <label>Produit lié (optionnel)
+          <select v-model="form.produit_id" class="inp">
+            <option value="">— Non résolu —</option>
+            <option v-for="p in data.produits" :key="p.id" :value="p.id">{{ p.designation }} ({{ p.gencod }})</option>
+          </select>
+        </label>
+      </template>
+      <!-- Catalogue interne -->
+      <template v-if="modal.type === 'interne'">
+        <label>Code interne <input v-model="form.code_interne" class="inp" :disabled="!!modal.item" /></label>
+        <label>Libellé <input v-model="form.libelle_produit" class="inp" /></label>
+        <label>Famille
+          <select v-model="form.famille_code" class="inp">
+            <option v-for="f in data.familles" :key="f.code" :value="f.code">{{ f.code }} — {{ f.libelle }}</option>
+          </select>
+        </label>
+      </template>
+    </Modal>
+
+    <!-- ── CONFIRMATION SUPPRESSION ── -->
+    <ConfirmSuppr v-if="suppr.visible"
+      :message="`Supprimer « ${suppr.label} » ?`"
+      @annuler="suppr.visible = false"
+      @confirmer="confirmerSuppr" />
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, reactive } from 'vue';
 import { api } from '../services/api';
+import Modal from '../components/Modal.vue';
+import ConfirmSuppr from '../components/ConfirmSuppr.vue';
 
-const onglet = ref('produits');
-const produits = ref([]);
-const tarifs = ref([]);
-const interne = ref([]);
-const familles = ref([]);
-const clients = ref([]);
+const onglet = ref('clients');
+const data = reactive({ clients: [], produits: [], tarifs: [], codes: [], familles: [], interne: [] });
+const q = reactive({ clients: '', produits: '', tarifs: '', tarifClient: '', codes: '', codesClient: '', interne: '', famille: '' });
+const modal = reactive({ visible: false, type: '', titre: '', item: null });
+const form = ref({});
+const suppr = reactive({ visible: false, type: '', item: null, label: '' });
 
-const rechercheProduit = ref('');
-const rechercheTarif = ref('');
-const rechercheInterne = ref('');
-const filtreClient = ref('');
-const filtreFamille = ref('');
+const onglets = computed(() => [
+  { id: 'clients',  label: 'Clients',   count: data.clients.length },
+  { id: 'produits', label: 'Produits',  count: data.produits.length },
+  { id: 'tarifs',   label: 'Tarifs',    count: data.tarifs.length },
+  { id: 'codes',    label: 'Codes internes', count: data.codes.length },
+  { id: 'interne',  label: 'Catalogue interne', count: data.interne.length },
+]);
 
-const editId = ref(null);
-const editData = ref({});
-const confirm = ref(null);
+const filtres = computed(() => ({
+  clients: data.clients.filter(c => c.nom.toLowerCase().includes(q.clients.toLowerCase())),
+  produits: data.produits.filter(p =>
+    p.designation.toLowerCase().includes(q.produits.toLowerCase()) || p.gencod.includes(q.produits)),
+  tarifs: data.tarifs.filter(t =>
+    t.designation.toLowerCase().includes(q.tarifs.toLowerCase()) || t.gencod?.includes(q.tarifs)),
+  codes: data.codes.filter(c =>
+    c.code_interne.toLowerCase().includes(q.codes.toLowerCase()) ||
+    (c.designation || '').toLowerCase().includes(q.codes.toLowerCase())),
+  interne: data.interne.filter(r =>
+    (!q.famille || r.famille_code == q.famille) &&
+    (r.code_interne.toLowerCase().includes(q.interne.toLowerCase()) ||
+     r.libelle_produit.toLowerCase().includes(q.interne.toLowerCase()))),
+}));
 
-const produitsFiltres = computed(() => {
-  const q = rechercheProduit.value.toLowerCase();
-  return produits.value.filter(p =>
-    p.designation.toLowerCase().includes(q) || p.gencod.includes(q)
-  );
-});
+const fmt = v => v ? Number(v).toFixed(2) + ' €' : '—';
 
-const tarifsFiltres = computed(() => {
-  const q = rechercheTarif.value.toLowerCase();
-  return tarifs.value.filter(t =>
-    (!q || t.designation.toLowerCase().includes(q) || t.gencod.includes(q))
-  );
-});
-
-const interneFiltre = computed(() => {
-  const q = rechercheInterne.value.toLowerCase();
-  return interne.value.filter(r =>
-    (!filtreFamille.value || r.famille_code == filtreFamille.value) &&
-    (!q || r.code_interne.toLowerCase().includes(q) || r.libelle_produit.toLowerCase().includes(q))
-  );
-});
-
-async function chargerProduits() {
-  produits.value = await api.get('/referentiels/produits');
+async function chargerClients()  { data.clients  = await api.get('/referentiels/clients'); }
+async function chargerProduits() { data.produits = await api.get('/referentiels/produits'); }
+async function chargerTarifs()   {
+  const p = q.tarifClient ? '?client_id=' + q.tarifClient : '';
+  data.tarifs = await api.get('/referentiels/tarifs' + p);
+}
+async function chargerCodes()    {
+  const p = q.codesClient ? '?client_id=' + q.codesClient : '';
+  data.codes = await api.get('/referentiels/codes-internes' + p);
+}
+async function chargerInterne()  {
+  const r = await api.get('/referentiels/interne');
+  data.familles = r.familles; data.interne = r.produits;
 }
 
-async function chargerTarifs() {
-  const params = filtreClient.value ? '?client_id=' + filtreClient.value : '';
-  tarifs.value = await api.get('/referentiels/tarifs' + params);
-  if (!clients.value.length) clients.value = await api.get('/referentiels/clients');
+async function changerOnglet(id) {
+  onglet.value = id;
+  if (id === 'clients'  && !data.clients.length)  await chargerClients();
+  if (id === 'produits' && !data.produits.length) await chargerProduits();
+  if (id === 'tarifs')   await chargerTarifs();
+  if (id === 'codes')    await chargerCodes();
+  if (id === 'interne')  await chargerInterne();
 }
 
-async function chargerInterne() {
-  const data = await api.get('/referentiels/interne');
-  interne.value = data.produits || [];
-  familles.value = data.familles || [];
+function ouvrir(type, item = null) {
+  modal.type = type;
+  modal.item = item;
+  modal.titre = item ? 'Modifier' : 'Ajouter';
+  modal.visible = true;
+  form.value = item ? { ...item } : defaultForm(type);
 }
 
-function editer(p) {
-  editId.value = p.id;
-  editData.value = { designation: p.designation, unite: p.unite, dluo_jours: p.dluo_jours };
+function defaultForm(type) {
+  if (type === 'clients')  return { nom: '', jour_fixe_livraison: '', actif: true };
+  if (type === 'produits') return { gencod: '', designation: '', unite: '', dluo_jours: null, actif: true };
+  if (type === 'tarifs')   return { client_id: '', produit_id: '', pcb: null, tarif_general: null, remise_pct: null, tarif_net: null, unite_facturation: '' };
+  if (type === 'codes')    return { client_id: '', code_interne: '', produit_id: '' };
+  if (type === 'interne')  return { code_interne: '', libelle_produit: '', famille_code: '' };
+  return {};
 }
 
-async function sauvegarderProduit(p) {
-  await api.patch('/referentiels/produits/' + p.id, editData.value);
-  Object.assign(p, editData.value);
-  editId.value = null;
-}
+async function sauvegarder() {
+  const t = modal.type;
+  const item = modal.item;
+  const body = { ...form.value };
+  if (body.produit_id === '') body.produit_id = null;
 
-async function confirmerSuppression() {
-  const { type, item } = confirm.value;
-  if (type === 'produit') {
-    await api.delete('/referentiels/produits/' + item.id);
-    produits.value = produits.value.filter(p => p.id !== item.id);
+  if (t === 'clients') {
+    if (item) { await api.patch('/referentiels/clients/' + item.id, body); Object.assign(item, body); }
+    else { const n = await api.post('/referentiels/clients', body); data.clients.push(n); }
+  } else if (t === 'produits') {
+    if (item) { await api.patch('/referentiels/produits/' + item.id, body); Object.assign(item, body); }
+    else { const n = await api.post('/referentiels/produits', body); data.produits.push(n); }
+  } else if (t === 'tarifs') {
+    if (item) { await api.patch('/referentiels/tarifs/' + item.id, body); await chargerTarifs(); }
+    else { await api.post('/referentiels/tarifs', body); await chargerTarifs(); }
+  } else if (t === 'codes') {
+    if (item) { await api.patch('/referentiels/codes-internes/' + item.id, body); await chargerCodes(); }
+    else { await api.post('/referentiels/codes-internes', body); await chargerCodes(); }
+  } else if (t === 'interne') {
+    if (item) { await api.patch('/referentiels/interne/produits/' + item.code_interne, body); await chargerInterne(); }
+    else { await api.post('/referentiels/interne/produits', body); await chargerInterne(); }
   }
-  confirm.value = null;
+  modal.visible = false;
 }
 
-onMounted(chargerProduits);
+function demanderSuppr(type, item, label) {
+  suppr.type = type; suppr.item = item; suppr.label = label; suppr.visible = true;
+}
+
+async function confirmerSuppr() {
+  const { type, item } = suppr;
+  if (type === 'clients')  { await api.delete('/referentiels/clients/' + item.id); data.clients = data.clients.filter(c => c.id !== item.id); }
+  if (type === 'produits') { await api.delete('/referentiels/produits/' + item.id); data.produits = data.produits.filter(p => p.id !== item.id); }
+  if (type === 'tarifs')   { await api.delete('/referentiels/tarifs/' + item.id); await chargerTarifs(); }
+  if (type === 'codes')    { await api.delete('/referentiels/codes-internes/' + item.id); await chargerCodes(); }
+  if (type === 'interne')  { await api.delete('/referentiels/interne/produits/' + item.code_interne); await chargerInterne(); }
+  suppr.visible = false;
+}
+
+onMounted(chargerClients);
 </script>
 
 <style scoped>
-.page { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+.page { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
 .page-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
 h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
-.tabs { display: flex; gap: 4px; background: #f0ece0; border-radius: 8px; padding: 4px; }
-.tab { border: none; background: transparent; padding: 7px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; color: #5a6070; font-weight: 500; }
+.tabs { display: flex; gap: 3px; background: #f0ece0; border-radius: 8px; padding: 4px; flex-wrap: wrap; }
+.tab { border: none; background: transparent; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.83rem; color: #5a6070; font-weight: 500; display: flex; align-items: center; gap: 5px; }
 .tab.active { background: white; color: #1a2a4a; font-weight: 700; box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
-.toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.search { padding: 8px 12px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.85rem; background: white; min-width: 200px; }
+.count { background: #e0dbd0; color: #5a4a30; border-radius: 10px; padding: 1px 7px; font-size: 0.72rem; font-weight: 700; }
+.tab.active .count { background: #2f6f4f; color: white; }
+.toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+.search { padding: 8px 12px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.85rem; background: white; min-width: 180px; }
+.btn { padding: 8px 18px; border-radius: 6px; border: none; font-size: 0.85rem; cursor: pointer; font-weight: 600; }
+.btn.primary { background: #2f6f4f; color: white; }
 .table-wrap { background: white; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); overflow: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+table { width: 100%; border-collapse: collapse; font-size: 0.855rem; }
 thead { background: #f5f2e8; }
-th { padding: 10px 14px; text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #5a6070; font-weight: 600; border-bottom: 2px solid #e8e3d5; white-space: nowrap; }
+th { padding: 9px 14px; text-align: left; font-size: 0.71rem; text-transform: uppercase; letter-spacing: 0.05em; color: #5a6070; font-weight: 600; border-bottom: 2px solid #e8e3d5; white-space: nowrap; }
 td { padding: 9px 14px; border-bottom: 1px solid #f0ece0; vertical-align: middle; }
 tr:last-child td { border-bottom: none; }
 tr:hover { background: #faf8f2; }
 .mono { font-family: monospace; font-size: 0.82rem; color: #4a7a5a; }
 .num { font-variant-numeric: tabular-nums; text-align: right; }
 .prix { font-weight: 700; color: #1a2a4a; }
-.edit-input { border: 1px solid #2f6f4f; border-radius: 4px; padding: 4px 8px; font-size: 0.875rem; width: 100%; }
-.edit-input.small { width: 70px; }
-.actions { display: flex; gap: 4px; }
-.btn-icon { border: none; background: transparent; cursor: pointer; font-size: 0.9rem; padding: 4px 8px; border-radius: 4px; }
-.btn-icon:hover { background: #f0ece0; }
-.btn-icon.danger:hover { background: #fde8e8; color: #b3261e; }
-.btn-icon.ok { color: #2f6f4f; font-weight: 700; }
-.badge-actif { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
-.badge-actif.actif { background: #eef6ec; color: #2f6f4f; }
-.badge-actif.inactif { background: #f0ece0; color: #7a6050; }
-.badge-famille { font-size: 0.78rem; background: #f0ece0; color: #5a4a30; padding: 2px 8px; border-radius: 10px; }
-.confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; display: flex; align-items: center; justify-content: center; }
-.confirm-box { background: white; border-radius: 10px; padding: 24px; max-width: 400px; width: 90%; }
-.confirm-box p { margin: 0 0 20px; line-height: 1.5; }
-.confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
-.btn { padding: 8px 18px; border-radius: 6px; border: none; font-size: 0.88rem; cursor: pointer; font-weight: 600; }
-.btn.secondary { background: #f0ece0; color: #1a2a4a; }
-.btn.danger { background: #b3261e; color: white; }
+.muted { color: #9a9a9a; font-style: italic; }
+.act { display: flex; gap: 4px; }
+.btn-ico { border: none; background: transparent; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 0.88rem; }
+.btn-ico:hover { background: #f0ece0; }
+.btn-ico.rouge:hover { background: #fde8e8; color: #b3261e; }
+.badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+.badge.vert { background: #eef6ec; color: #2f6f4f; }
+.badge.gris { background: #f0ece0; color: #5a4a30; }
+label { display: flex; flex-direction: column; gap: 5px; font-size: 0.85rem; font-weight: 600; color: #3a4a5a; }
+.row-check { flex-direction: row; align-items: center; gap: 8px; font-weight: 500; }
+.inp { padding: 8px 10px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.875rem; background: white; width: 100%; box-sizing: border-box; }
+.inp:focus { outline: none; border-color: #2f6f4f; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
 </style>
