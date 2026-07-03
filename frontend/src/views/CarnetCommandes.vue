@@ -273,14 +273,16 @@ onMounted(charger);
 <style scoped>
 /* ── Variables ── */
 :root {
-  --paper:    #fbf9f3;
-  --ink:      #1a2a4a;
-  --unsure:   #fff3a0;
-  --muted:    #8a8470;
-  --line:     #ddd7c2;
-  --done-bg:  #eef6ec;
-  --accent:   #2f6f4f;
-  --prix:     #4a7a5a;
+  --paper:    #fffdf8;
+  --ink:      #0f2138;
+  --unsure:   #ffe066;
+  --unsure-border: #c9a300;
+  --muted:    #6b6455;
+  --line:     #d8d0ba;
+  --done-bg:  #e3f2e6;
+  --accent:   #22633f;
+  --prix:     #2f6b47;
+  --field-border: #a89b7a;
 }
 
 .carnet { background: #e7e2d3; min-height: 100vh; padding-bottom: 80px; }
@@ -322,11 +324,11 @@ h1 { margin: 0; font-size: 1rem; font-weight: 600; }
 
 /* En-tête colonnes */
 .head-row { display: grid; grid-template-columns: 44px 1fr 260px; gap: 8px; padding: 4px 12px 0; }
-.col-label { font-size: 0.65rem; text-transform: uppercase; color: var(--muted); text-align: center; letter-spacing: 0.03em; }
+.col-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; color: var(--ink); opacity: 0.55; text-align: center; letter-spacing: 0.05em; }
 
 /* Bloc client */
 .client-block { background: var(--paper); border-radius: 10px; margin-bottom: 16px; box-shadow: 0 1px 6px rgba(0,0,0,0.12); overflow: hidden; }
-.client-name { font-weight: 700; color: var(--ink); font-size: 1rem; padding: 10px 12px; background: #f2eedf; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+.client-name { font-weight: 800; color: var(--ink); font-size: 1.05rem; padding: 12px 14px; background: #ece4c8; border-bottom: 2px solid var(--line); display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
 .commande-infos { font-size: 0.75rem; font-weight: 500; color: var(--muted); }
 
 /* Ligne */
@@ -334,7 +336,7 @@ h1 { margin: 0; font-size: 1rem; font-weight: 600; }
 .row:last-child { border-bottom: none; }
 .row.done { background: var(--done-bg); }
 .row.done .prodline { text-decoration: line-through; color: #6b7a6b; opacity: 0.75; }
-.row.unsure:not(.done) { background: #fffaf0; }
+.row.unsure:not(.done) { background: #fff9e8; border-left: 3px solid var(--unsure-border); }
 
 /* Coche */
 .check { width: 30px; height: 30px; accent-color: var(--accent); cursor: pointer; }
@@ -344,27 +346,40 @@ h1 { margin: 0; font-size: 1rem; font-weight: 600; }
 .qty { font-weight: 700; color: var(--ink); margin-right: 2px; white-space: nowrap; }
 
 /* Texte de designation : simple par defaut (fidele a la maquette), surligne si incertain, clic pour corriger */
-.design-text { cursor: text; padding: 1px 2px; border-radius: 2px; }
-.design-text.unsure { background: var(--unsure); padding: 0 2px; border-radius: 2px; }
-.design-text:hover { outline: 1px dashed #cfc8af; }
+.design-text { cursor: text; padding: 1px 3px; border-radius: 3px; color: #1a1a1a; }
+.design-text.unsure { background: var(--unsure); padding: 1px 5px; border-radius: 3px; font-weight: 600; box-shadow: inset 0 0 0 1px var(--unsure-border); }
+.design-text:hover { outline: 1px dashed var(--field-border); }
 
 .product-input { font-size: 0.92rem; border: 1px solid var(--accent); border-radius: 6px; padding: 4px 8px; flex: 1; min-width: 140px; background: white; }
 .product-input.unsure { background: var(--unsure); border-color: #d8c400; }
 .product-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
 
 /* Reference : tag bracket vert style maquette "[FBE09]", clic pour corriger */
-.ref-tag { font-size: 0.82rem; color: var(--prix); font-weight: 600; cursor: text; white-space: nowrap; }
+.ref-tag { font-size: 0.82rem; color: var(--prix); font-weight: 700; cursor: text; white-space: nowrap; background: #e3f2e6; padding: 1px 6px; border-radius: 4px; }
 .ref-tag:hover { text-decoration: underline dotted; }
 .ref-input { font-size: 0.82rem; border: 1px solid var(--accent); background: white; padding: 2px 6px; color: var(--prix); width: 90px; border-radius: 4px; }
 .ref-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
 
 .prix-hint { font-size: 0.75rem; color: var(--prix); font-weight: 600; white-space: nowrap; }
-.unsure-label { background: var(--unsure); padding: 2px 6px; border-radius: 4px; font-size: 0.84rem; color: #7a6000; flex: 1; white-space: pre-wrap; }
+.unsure-label { background: var(--unsure); padding: 4px 8px; border-radius: 4px; font-size: 0.84rem; font-weight: 600; color: #5c4700; flex: 1; white-space: pre-wrap; box-shadow: inset 0 0 0 1px var(--unsure-border); }
 
 /* Champs DLC / Lot */
 .fields { display: flex; gap: 8px; min-width: 0; }
-.field { width: 100%; min-width: 0; border: 1px solid #cfc8af; border-radius: 6px; padding: 7px 6px; font-size: 0.82rem; background: white; text-align: center; }
-.field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(47,111,79,0.25); }
+.field {
+  width: 100%; min-width: 0;
+  border: 1.5px solid var(--field-border);
+  border-radius: 6px;
+  padding: 7px 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: white;
+  text-align: center;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
+}
+.field::placeholder { color: #a89b7a; font-weight: 500; }
+.field:hover { border-color: var(--accent); }
+.field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(34,99,63,0.18); }
 .field-dlc { flex: 1.15; } /* le champ date natif a besoin d'un peu plus de place */
 .field-lot { flex: 1; }
 
