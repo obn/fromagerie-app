@@ -51,11 +51,32 @@ function parseQte(s) {
 }
 
 // ── DISTRAL ──────────────────────────────────────────────────────────────────
+// Format reel du bon de commande PDF Distral (extrait via pdf-parse) :
+//   Date de commande: 03/07/26
+//   Date de livraison: 18/06/26
+//   Code Votre réf. Intitulé Matière DLC minimum Quantité Commandée
+//   Quantité en U Fact Prix Unitaire Montant
+//
+//   03066 FBE09 BOUCHON
+//   7 EPICES
+//   FERMIER
+//   VRAC
+//   5KGS
+//   03/07/26 1 COL 5,000
+//   KG
+//   19,030
+//   EUR
+//   95,15
+//
+// -> code interne Distral (03066) + notre reference (FBE09) + designation
+//    multi-lignes + DLC minimum + quantite commandee + unite colis +
+//    quantite facturee + unite + prix + devise + montant.
 function parserDistral(texte) {
   const lignes = [];
 
   // N° commande
-  const mCmd = texte.match(/(?:commande|order)\s*n[°o]?\s*:?\s*(\d+)/i)
+  const mCmd = texte.match(/commande\s+fournisseur\s+(\d+)/i)
+    || texte.match(/(?:commande|order)\s*n[°o]?\s*:?\s*(\d+)/i)
     || texte.match(/(\d{6,})/);
   const numeroCommande = mCmd ? mCmd[1] : 'INCONNU';
 
@@ -64,28 +85,46 @@ function parserDistral(texte) {
   const mDateLiv = texte.match(/date\s+(?:de\s+)?livraison\s*:?\s*([0-9/]+)/i)
     || texte.match(/livraison\s+(?:le\s+)?([0-9/]+)/i);
 
-  // Lignes produit : pattern "CODE   QTE   DESIGNATION"
-  // Ex: "FBN08   14   BOUCHON NATURE VRAC 5KG"
-  const regLigne = /^([A-Z][A-Z0-9]{2,8})\s+(\d+(?:[.,]\d+)?)\s+(.+)$/gm;
+  // Le tableau produit commence juste apres la ligne d'en-tete de colonnes
+  // ("...Prix Unitaire Montant"). Tout ce qui precede (adresse, contacts,
+  // codes postaux) est ignore pour eviter les faux positifs.
+  const idxDebutTableau = texte.search(/montant\s*\n/i);
+  const zoneTableau = idxDebutTableau >= 0 ? texte.slice(idxDebutTableau) : texte;
+
+  // Chaque bloc produit commence par : code interne Distral (4-6 chiffres) + notre ref (alphanumerique)
+  const regBloc = /(\d{4,6})\s+([A-Z0-9]{3,10})\s+([\s\S]*?)(?=\n?\d{4,6}\s+[A-Z0-9]{3,10}\s|$)/g;
   let m;
-  while ((m = regLigne.exec(texte)) !== null) {
-    const code = m[1].trim();
-    const qte  = parseQte(m[2]);
-    const des  = m[3].trim();
-    // Filtrer les faux positifs (codes qui ressemblent à des en-têtes)
-    if (['REF', 'QTE', 'QUANTITE', 'PRODUIT', 'DESIGNATION', 'TOTAL'].includes(code)) continue;
+  while ((m = regBloc.exec(zoneTableau)) !== null) {
+    const votreRef = m[2].trim();  // ex: FBE09 (notre code interne, cle de resolution)
+    const reste = m[3].trim();
+
+    // Le "reste" contient : designation (plusieurs lignes) puis une ligne
+    // "DLC_DATE  QUANTITE  UNITE  POIDS" qui marque la fin de la designation.
+    const mDlcQte = reste.match(/(\d{2}\/\d{2}\/\d{2})\s+(\d+(?:[.,]\d+)?)\s+(\w+)\s+([\d,]+)/);
+
+    // Sans ce motif, le bloc capture n'est pas une vraie ligne produit (faux positif) — on l'ignore.
+    if (!mDlcQte) continue;
+
+    const designation = reste.slice(0, mDlcQte.index).replace(/\s*\n\s*/g, ' ').trim();
+    const poidsFacture = parseQte(mDlcQte[4]); // ex: 5,000 (kg factures)
+    const quantiteColis = parseQte(mDlcQte[2]);
+    const uniteColis = mDlcQte[3]; // ex: COL
+
+    if (!designation) continue;
+
     lignes.push({
-      codeInterne: code,
+      codeInterne: votreRef,
       gencod: null,
-      designationBrute: des,
-      quantite: qte,
-      unite: null,
+      designationBrute: designation,
+      // Le poids facture (KG) est plus parlant en production que le nombre de colis
+      quantite: poidsFacture ?? quantiteColis,
+      unite: poidsFacture ? 'KG' : uniteColis,
       certitude: 'haute',
       ligneBrute: m[0].trim(),
     });
   }
 
-  // Si aucune ligne trouvée avec le pattern strict → mode dégradé
+  // Mode degrade si aucun bloc reconnu (format totalement different)
   if (lignes.length === 0) {
     for (const ligne of texte.split('\n')) {
       const l = ligne.trim();
