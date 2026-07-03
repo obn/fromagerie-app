@@ -5,8 +5,12 @@ const router = express.Router();
 
 // GET /api/carnet/:annee/:mois/:jour
 // Reconstruit la structure attendue par CarnetCommandes.vue : groupe par client,
-// avec pour chaque ligne la reference produit (gencod) et le tarif propre a ce client
-// (utile pour aider la saisie/verification au moment de la preparation).
+// avec pour chaque ligne la reference produit (gencod) et le tarif propre a ce client.
+//
+// Le carnet du jour affiche les commandes RECUES ce jour-la (date_commande),
+// pas celles a livrer (date_livraison) — c'est le carnet de reception/traitement
+// quotidien, pas un planning de livraison. Filet de securite : si date_commande
+// n'a pas ete extraite du PDF, on se rabat sur la date d'insertion en base.
 router.get('/:annee/:mois/:jour', async (req, res) => {
   try {
     const { annee, mois, jour } = req.params;
@@ -14,7 +18,13 @@ router.get('/:annee/:mois/:jour', async (req, res) => {
 
     const commandes = await knex('commandes')
       .join('clients', 'clients.id', 'commandes.client_id')
-      .where('commandes.date_livraison', date)
+      .where(function () {
+        this.where('commandes.date_commande', date)
+          .orWhere(function () {
+            this.whereNull('commandes.date_commande')
+              .andWhereRaw('DATE(commandes.created_at) = ?', [date]);
+          });
+      })
       .select('commandes.*', 'clients.nom as client_nom');
 
     const result = [];
