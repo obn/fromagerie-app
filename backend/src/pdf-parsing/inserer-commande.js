@@ -3,9 +3,46 @@
  * - Résout le client via son nom (colonne clients.nom)
  * - Evite les doublons via (client_id, numero_commande)
  * - Résout produit_id via codes_internes si disponible
+ * - Calcule la date de livraison réelle à partir du jour fixe du client
+ *   (clients.jour_fixe_livraison), PAS depuis la date lue dans le PDF —
+ *   celle-ci est souvent absente, mal formatée ou non fiable selon les
+ *   fournisseurs.
  */
 
 const knex = require('../db/knex');
+
+const JOURS_SEMAINE = {
+  dimanche: 0, lundi: 1, mardi: 2, mercredi: 3,
+  jeudi: 4, vendredi: 5, samedi: 6,
+};
+
+/**
+ * Calcule la prochaine date (>= dateAncrage) tombant sur le jour de la
+ * semaine demandé. Si dateAncrage tombe déjà sur ce jour, elle est
+ * retournée telle quelle.
+ *
+ * @param {string} dateAncrage - 'YYYY-MM-DD', date de départ du calcul (typiquement date_commande)
+ * @param {string} jourFixeLivraison - ex: 'jeudi' (insensible à la casse)
+ * @returns {string|null} 'YYYY-MM-DD' ou null si jourFixeLivraison invalide
+ */
+function calculerDateLivraison(dateAncrage, jourFixeLivraison) {
+  if (!jourFixeLivraison) return null;
+
+  const jourCible = JOURS_SEMAINE[jourFixeLivraison.trim().toLowerCase()];
+  if (jourCible === undefined) {
+    console.warn(`[date_livraison] Jour fixe non reconnu : "${jourFixeLivraison}"`);
+    return null;
+  }
+
+  const base = dateAncrage ? new Date(dateAncrage + 'T12:00:00') : new Date();
+  const jourActuel = base.getDay();
+  let decalage = (jourCible - jourActuel + 7) % 7;
+
+  const resultat = new Date(base);
+  resultat.setDate(resultat.getDate() + decalage);
+
+  return resultat.toISOString().slice(0, 10);
+}
 
 async function insererCommande(commande, options = {}) {
   const { gmailMessageId = null, fichierPdfUrl = null } = options;
@@ -33,24 +70,35 @@ async function insererCommande(commande, options = {}) {
     return { doublon: true, commandeId: existante.id };
   }
 
+  // ── Calcul de la date de livraison réelle ─────────────────────────────────
+  // On ignore volontairement commande.dateLivraison (lue dans le PDF, non fiable) :
+  // la vraie date de livraison est déterminée par le jour fixe du client.
+  const dateLivraisonCalculee = calculerDateLivraison(commande.dateCommande, client.jour_fixe_livraison);
+
+  if (!dateLivraisonCalculee) {
+    console.warn(
+      `[import] Aucun jour fixe de livraison configuré pour "${client.nom}" — ` +
+      `date_livraison laissée vide, à renseigner manuellement`
+    );
+  }
+
   // ── Insertion commande ────────────────────────────────────────────────────
   const [commandeId] = await knex('commandes').insert({
-    numero_commande:       commande.numeroCommande,
-    client_id:             client.id,
-    date_commande:         commande.dateCommande   || null,
-    date_livraison:        commande.dateLivraison  || null,
-    date_livraison_pdf_brute: commande.dateLivraisonBrute || null,
-    statut:                'a_verifier',
-    source:                'gmail',
-    gmail_message_id:      gmailMessageId,
-    fichier_pdf_url:       fichierPdfUrl,
+    numero_commande:          commande.numeroCommande,
+    client_id:                client.id,
+    date_commande:            commande.dateCommande       || null,
+    date_livraison:           dateLivraisonCalculee        || null,
+    date_livraison_pdf_brute: commande.dateLivraison       || null, // conservée pour trace/audit
+    statut:                   'a_verifier',
+    source:                   'gmail',
+    gmail_message_id:         gmailMessageId,
+    fichier_pdf_url:          fichierPdfUrl,
   });
 
   // ── Insertion lignes ──────────────────────────────────────────────────────
   let nbResolues = 0;
 
   for (const ligne of commande.lignes || []) {
-    // Tentative de résolution via codes_internes
     let produitId = null;
     if (ligne.codeInterne) {
       const ci = await knex('codes_internes')
@@ -58,7 +106,6 @@ async function insererCommande(commande, options = {}) {
         .first();
       if (ci?.produit_id) { produitId = ci.produit_id; nbResolues++; }
     }
-    // Si gencod direct → résolution par gencod
     if (!produitId && ligne.gencod) {
       const p = await knex('produits').where({ gencod: ligne.gencod }).first();
       if (p) { produitId = p.id; nbResolues++; }
@@ -78,10 +125,11 @@ async function insererCommande(commande, options = {}) {
 
   console.log(
     `[import] Commande ${commande.numeroCommande} (${commande.client}) insérée — ` +
+    `livraison calculée : ${dateLivraisonCalculee || 'non déterminée'} — ` +
     `${commande.lignes.length} ligne(s), ${nbResolues} résolu(s) automatiquement`
   );
 
-  return { doublon: false, commandeId, nbLignes: commande.lignes.length, nbResolues };
+  return { doublon: false, commandeId, nbLignes: commande.lignes.length, nbResolues, dateLivraisonCalculee };
 }
 
-module.exports = { insererCommande };
+module.exports = { insererCommande, calculerDateLivraison };
