@@ -1,23 +1,14 @@
 /**
- * Module de récupération des commandes depuis Gmail.
+ * Module principal Gmail : sync des commandes depuis les mails.
  *
- * Flux :
- * 1. Se connecte à Gmail via OAuth2
- * 2. Cherche les mails non lus du label configuré (GMAIL_LABEL_COMMANDES)
- * 3. Pour chaque mail → extrait les pièces jointes PDF
- * 4. Parse chaque PDF (détection fournisseur automatique)
- * 5. Insère commande + lignes en base
- * 6. Marque le mail comme lu (évite le re-traitement)
- *
- * Appelé :
- * - Manuellement via POST /api/gmail/sync
- * - Automatiquement toutes les X minutes (cron, configurable via parametre DB)
+ * IMPORTANT : n'utilise PAS le client googleapis pour les appels réseau
+ * (gaxios/fetch plante avec "Premature close" sur Railway). Tous les appels
+ * passent par requeteGmailApi() qui utilise le module https natif de Node.
  */
 
 require('dotenv').config();
-const { google } = require('googleapis');
 const pdfParse = require('pdf-parse');
-const { creerClientAuthentifie } = require('./auth');
+const { creerClientAuthentifie, requeteGmailApi } = require('./auth');
 const { parserPdf } = require('../pdf-parsing/parsers');
 const { insererCommande } = require('../pdf-parsing/inserer-commande');
 const knex = require('../db/knex');
@@ -33,66 +24,80 @@ async function getLabelCommandes() {
   }
 }
 
-// ── Résolution de l'ID du label Gmail par son nom ───────────────────────────
-async function resoudreLabelId(gmail, nomLabel) {
-  const res = await gmail.users.labels.list({ userId: 'me' });
-  const labels = res.data.labels || [];
+async function resoudreLabelId(accessToken, nomLabel) {
+  const res = await requeteGmailApi(accessToken, '/gmail/v1/users/me/labels');
+  const labels = res.labels || [];
   const label = labels.find(l => l.name.toLowerCase() === nomLabel.toLowerCase());
-  if (!label) throw new Error(`Label Gmail "${nomLabel}" introuvable. Labels disponibles : ${labels.map(l => l.name).join(', ')}`);
+  if (!label) {
+    throw new Error(`Label Gmail "${nomLabel}" introuvable. Labels disponibles : ${labels.map(l => l.name).join(', ')}`);
+  }
   return label.id;
 }
 
-// ── Extraction des pièces jointes PDF d'un message ──────────────────────────
-async function extrairePiecesJointes(gmail, messageId) {
-  const msg = await gmail.users.messages.get({ userId: 'me', id: messageId, format: 'full' });
+async function extrairePiecesJointes(accessToken, messageId) {
+  const msg = await requeteGmailApi(accessToken, `/gmail/v1/users/me/messages/${messageId}?format=full`);
   const pieces = [];
 
   function parcourirParts(parts = []) {
     for (const part of parts) {
       if (part.parts) parcourirParts(part.parts);
-      if (part.mimeType === 'application/pdf' || (part.filename && part.filename.toLowerCase().endsWith('.pdf'))) {
-        pieces.push({ filename: part.filename, attachmentId: part.body?.attachmentId, data: part.body?.data });
+      if (
+        part.mimeType === 'application/pdf' ||
+        (part.filename && part.filename.toLowerCase().endsWith('.pdf'))
+      ) {
+        pieces.push({
+          filename: part.filename || 'commande.pdf',
+          attachmentId: part.body?.attachmentId,
+          data: part.body?.data,
+        });
       }
     }
   }
 
-  parcourirParts(msg.data.payload?.parts || [msg.data.payload]);
+  parcourirParts(msg.payload?.parts || [msg.payload]);
 
-  // Télécharger les pièces jointes par ID si nécessaire
   const resultat = [];
   for (const piece of pieces) {
-    let buffer;
-    if (piece.data) {
-      buffer = Buffer.from(piece.data, 'base64');
-    } else if (piece.attachmentId) {
-      const att = await gmail.users.messages.attachments.get({
-        userId: 'me', messageId, id: piece.attachmentId,
-      });
-      buffer = Buffer.from(att.data.data, 'base64');
+    let base64Data = piece.data;
+    if (!base64Data && piece.attachmentId) {
+      const att = await requeteGmailApi(
+        accessToken,
+        `/gmail/v1/users/me/messages/${messageId}/attachments/${piece.attachmentId}`
+      );
+      base64Data = att.data;
     }
-    if (buffer) resultat.push({ filename: piece.filename || 'commande.pdf', buffer });
+    if (base64Data) {
+      // Gmail utilise du base64url — le convertir en base64 standard
+      const normalise = base64Data.replace(/-/g, '+').replace(/_/g, '/');
+      resultat.push({ filename: piece.filename, buffer: Buffer.from(normalise, 'base64') });
+    }
   }
 
   return resultat;
 }
 
-// ── Traitement d'un seul message ─────────────────────────────────────────────
-async function traiterMessage(gmail, messageId) {
+async function marquerCommeLu(accessToken, messageId) {
+  await requeteGmailApi(accessToken, `/gmail/v1/users/me/messages/${messageId}/modify`, {
+    method: 'POST',
+    body: { removeLabelIds: ['UNREAD'] },
+  });
+}
+
+async function traiterMessage(accessToken, messageId) {
   const rapport = { messageId, pdfs: [], erreurs: [] };
 
   try {
-    const piecesJointes = await extrairePiecesJointes(gmail, messageId);
+    const piecesJointes = await extrairePiecesJointes(accessToken, messageId);
 
     if (piecesJointes.length === 0) {
-      rapport.erreurs.push('Aucune pièce jointe PDF trouvée dans ce mail');
+      rapport.erreurs.push('Aucune pièce jointe PDF trouvée');
       return rapport;
     }
 
     for (const { filename, buffer } of piecesJointes) {
       try {
         const pdfData = await pdfParse(buffer);
-        const texte = pdfData.text;
-        const commande = parserPdf(texte, filename);
+        const commande = parserPdf(pdfData.text, filename);
 
         if (!commande.client) {
           rapport.pdfs.push({ filename, statut: 'fournisseur_inconnu', commande });
@@ -106,13 +111,9 @@ async function traiterMessage(gmail, messageId) {
       }
     }
 
-    // Marquer le mail comme lu une fois tous les PDFs traités
-    const tousTrouves = rapport.pdfs.some(p => p.statut === 'insere' || p.statut === 'doublon');
-    if (tousTrouves) {
-      await gmail.users.messages.modify({
-        userId: 'me', id: messageId,
-        requestBody: { removeLabelIds: ['UNREAD'] },
-      });
+    const traite = rapport.pdfs.some(p => ['insere', 'doublon'].includes(p.statut));
+    if (traite) {
+      await marquerCommeLu(accessToken, messageId);
     }
   } catch (e) {
     rapport.erreurs.push(e.message);
@@ -121,44 +122,33 @@ async function traiterMessage(gmail, messageId) {
   return rapport;
 }
 
-// ── Sync principale ───────────────────────────────────────────────────────────
-async function syncGmail() {
-  const auth = creerClientAuthentifie();
-  const gmail = google.gmail({ version: 'v1', auth });
-  const rapports = [];
+async function syncGmail(modeForce = null) {
+  const { auth, mode, email } = await creerClientAuthentifie(modeForce);
+  const accessToken = auth.credentials.access_token;
 
   const nomLabel = await getLabelCommandes();
-  console.log(`[gmail] Sync du label "${nomLabel}"…`);
+  console.log(`[gmail] Sync mode="${mode}" (${email}), label="${nomLabel}"`);
 
-  let labelId;
-  try {
-    labelId = await resoudreLabelId(gmail, nomLabel);
-  } catch (e) {
-    throw new Error(`[gmail] ${e.message}`);
-  }
+  await resoudreLabelId(accessToken, nomLabel);
 
-  // Cherche les mails non lus du label
-  const res = await gmail.users.messages.list({
-    userId: 'me',
-    q: `label:"${nomLabel}" is:unread`,
-    maxResults: 20,
-  });
+  const q = encodeURIComponent(`label:"${nomLabel}" is:unread`);
+  const res = await requeteGmailApi(accessToken, `/gmail/v1/users/me/messages?q=${q}&maxResults=20`);
 
-  const messages = res.data.messages || [];
-  console.log(`[gmail] ${messages.length} mail(s) non lu(s) trouvé(s)`);
+  const messages = res.messages || [];
+  console.log(`[gmail] ${messages.length} mail(s) non lu(s)`);
 
+  const rapports = [];
   for (const { id } of messages) {
-    const rapport = await traiterMessage(gmail, id);
-    rapports.push(rapport);
+    rapports.push(await traiterMessage(accessToken, id));
   }
 
-  const nbInseres = rapports.flatMap(r => r.pdfs).filter(p => p.statut === 'insere').length;
+  const nbInseres  = rapports.flatMap(r => r.pdfs).filter(p => p.statut === 'insere').length;
   const nbDoublons = rapports.flatMap(r => r.pdfs).filter(p => p.statut === 'doublon').length;
-  const nbErreurs = rapports.flatMap(r => r.erreurs).length;
+  const nbErreurs  = rapports.flatMap(r => r.erreurs).length;
 
-  console.log(`[gmail] Sync terminée — ${nbInseres} commande(s) insérée(s), ${nbDoublons} doublon(s), ${nbErreurs} erreur(s)`);
+  console.log(`[gmail] Terminé — ${nbInseres} insérée(s), ${nbDoublons} doublon(s), ${nbErreurs} erreur(s)`);
 
-  return { nbMessages: messages.length, nbInseres, nbDoublons, nbErreurs, rapports };
+  return { mode, email, nbMessages: messages.length, nbInseres, nbDoublons, nbErreurs, rapports };
 }
 
 module.exports = { syncGmail };

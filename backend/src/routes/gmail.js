@@ -34,13 +34,11 @@ router.get('/statut', (req, res) => {
 // GET /api/gmail/test?mode=test|prod
 router.get('/test', async (req, res) => {
   try {
-    const { creerClientAuthentifie } = require('../gmail/auth');
-    const { google } = require('googleapis');
+    const { creerClientAuthentifie, requeteGmailApi } = require('../gmail/auth');
     const modeForce = req.query.mode || null;
     const { auth, mode, email } = await creerClientAuthentifie(modeForce);
-    const gmail = google.gmail({ version: 'v1', auth });
-    const profil = await gmail.users.getProfile({ userId: 'me' });
-    res.json({ ok: true, mode, email_config: email, email_gmail: profil.data.emailAddress });
+    const profil = await requeteGmailApi(auth.credentials.access_token, '/gmail/v1/users/me/profile');
+    res.json({ ok: true, mode, email_config: email, email_gmail: profil.emailAddress });
   } catch (e) {
     res.status(500).json({ ok: false, erreur: e.message });
   }

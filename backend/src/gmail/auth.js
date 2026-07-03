@@ -194,3 +194,44 @@ if (require.main === module) {
 }
 
 module.exports = { creerClientAuthentifie, getModeActif };
+
+// ── Requête HTTPS générique authentifiée (contourne gaxios/fetch) ───────────
+// Utilisée pour TOUS les appels à l'API Gmail, car googleapis/gaxios plante
+// systématiquement avec "Premature close" sur l'environnement réseau Railway.
+function requeteGmailApi(accessToken, path, { method = 'GET', body = null } = {}) {
+  const postData = body ? JSON.stringify(body) : null;
+
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: 'gmail.googleapis.com',
+        path,
+        method,
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          ...(postData ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(postData) } : {}),
+        },
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          try {
+            const json = data ? JSON.parse(data) : {};
+            if (res.statusCode >= 400) {
+              return reject(new Error(json.error?.message || `HTTP ${res.statusCode} sur ${path}`));
+            }
+            resolve(json);
+          } catch (e) {
+            reject(new Error(`Réponse Gmail API invalide (${path}) : ${data.slice(0, 200)}`));
+          }
+        });
+      }
+    );
+    req.on('error', reject);
+    if (postData) req.write(postData);
+    req.end();
+  });
+}
+
+module.exports.requeteGmailApi = requeteGmailApi;
