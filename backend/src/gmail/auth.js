@@ -66,13 +66,84 @@ function getCredentials(mode) {
   return { clientId, clientSecret, refreshToken, email };
 }
 
+// ── Échange manuel refresh_token → access_token via https natif ─────────────
+// La librairie googleapis/gaxios utilise le fetch natif de Node (undici),
+// qui provoque une erreur "Premature close" sur certains hébergeurs (Railway
+// notamment) lors du streaming de la réponse JSON de oauth2.googleapis.com.
+// On contourne le problème en faisant l'appel HTTPS nous-mêmes avec le
+// module natif "https", qui n'a pas ce bug.
+const https = require('https');
+
+function echangerRefreshToken(clientId, clientSecret, refreshToken) {
+  const postData = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    refresh_token: refreshToken,
+    grant_type: 'refresh_token',
+  }).toString();
+
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: 'oauth2.googleapis.com',
+        path: '/token',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(postData),
+        },
+      },
+      (res) => {
+        let body = '';
+        res.on('data', (chunk) => { body += chunk; });
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(body);
+            if (res.statusCode !== 200) {
+              return reject(new Error(json.error_description || json.error || `HTTP ${res.statusCode}`));
+            }
+            resolve(json);
+          } catch (e) {
+            reject(new Error('Réponse OAuth invalide : ' + body.slice(0, 200)));
+          }
+        });
+      }
+    );
+    req.on('error', reject);
+    req.write(postData);
+    req.end();
+  });
+}
+
+async function avecRetry(fn, tentatives = 3, delaiMs = 800) {
+  let derniereErreur;
+  for (let i = 0; i < tentatives; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      derniereErreur = e;
+      if (i === tentatives - 1) throw e;
+      console.warn(`[gmail auth] Erreur réseau (tentative ${i + 1}/${tentatives}) : ${e.message} — nouvelle tentative dans ${delaiMs}ms`);
+      await new Promise(r => setTimeout(r, delaiMs));
+    }
+  }
+  throw derniereErreur;
+}
+
 // ── Création du client OAuth2 authentifié ────────────────────────────────────
 async function creerClientAuthentifie(modeForce = null) {
   const mode = modeForce || await getModeActif();
   const { clientId, clientSecret, refreshToken, email } = getCredentials(mode);
 
+  // Échange manuel (contourne le bug gaxios/undici "Premature close")
+  const tokens = await avecRetry(() => echangerRefreshToken(clientId, clientSecret, refreshToken));
+
   const auth = new google.auth.OAuth2(clientId, clientSecret, REDIRECT_URI);
-  auth.setCredentials({ refresh_token: refreshToken });
+  auth.setCredentials({
+    access_token: tokens.access_token,
+    refresh_token: refreshToken,
+    expiry_date: Date.now() + (tokens.expires_in || 3600) * 1000,
+  });
 
   return { auth, mode, email };
 }
