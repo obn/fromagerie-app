@@ -107,22 +107,22 @@
             </template>
           </div>
 
-          <!-- DLC -->
-          <input
-            type="date"
-            class="field"
-            :value="etats[ligne.id]?.dlc"
-            @input="majEtat(ligne.id, 'dlc', $event.target.value)"
-          />
-
-          <!-- Lot -->
-          <input
-            type="text"
-            class="field"
-            placeholder="Lot"
-            :value="etats[ligne.id]?.lot"
-            @input="majEtat(ligne.id, 'lot', $event.target.value)"
-          />
+          <!-- DLC + Lot regroupes : passent sous le produit sur petit ecran (evite le chevauchement) -->
+          <div class="fields">
+            <input
+              type="date"
+              class="field field-dlc"
+              :value="etats[ligne.id]?.dlc"
+              @input="majEtat(ligne.id, 'dlc', $event.target.value)"
+            />
+            <input
+              type="text"
+              class="field field-lot"
+              placeholder="Lot"
+              :value="etats[ligne.id]?.lot"
+              @input="majEtat(ligne.id, 'lot', $event.target.value)"
+            />
+          </div>
         </div>
       </div>
 
@@ -321,7 +321,7 @@ h1 { margin: 0; font-size: 1rem; font-weight: 600; }
 .wrap { max-width: 900px; margin: 0 auto; padding: 8px 14px 0; }
 
 /* En-tête colonnes */
-.head-row { display: grid; grid-template-columns: 44px 1fr 130px 130px; gap: 8px; padding: 4px 12px 0; }
+.head-row { display: grid; grid-template-columns: 44px 1fr 260px; gap: 8px; padding: 4px 12px 0; }
 .col-label { font-size: 0.65rem; text-transform: uppercase; color: var(--muted); text-align: center; letter-spacing: 0.03em; }
 
 /* Bloc client */
@@ -330,7 +330,7 @@ h1 { margin: 0; font-size: 1rem; font-weight: 600; }
 .commande-infos { font-size: 0.75rem; font-weight: 500; color: var(--muted); }
 
 /* Ligne */
-.row { display: grid; grid-template-columns: 44px 1fr 130px 130px; gap: 8px; align-items: center; padding: 9px 12px; border-bottom: 1px solid var(--line); transition: background 0.15s; }
+.row { display: grid; grid-template-columns: 44px 1fr 260px; column-gap: 8px; row-gap: 6px; align-items: center; padding: 9px 12px; border-bottom: 1px solid var(--line); transition: background 0.15s; }
 .row:last-child { border-bottom: none; }
 .row.done { background: var(--done-bg); }
 .row.done .prodline { text-decoration: line-through; color: #6b7a6b; opacity: 0.75; }
@@ -362,8 +362,11 @@ h1 { margin: 0; font-size: 1rem; font-weight: 600; }
 .unsure-label { background: var(--unsure); padding: 2px 6px; border-radius: 4px; font-size: 0.84rem; color: #7a6000; flex: 1; white-space: pre-wrap; }
 
 /* Champs DLC / Lot */
-.field { width: 100%; border: 1px solid #cfc8af; border-radius: 6px; padding: 7px 6px; font-size: 0.82rem; background: white; text-align: center; }
+.fields { display: flex; gap: 8px; min-width: 0; }
+.field { width: 100%; min-width: 0; border: 1px solid #cfc8af; border-radius: 6px; padding: 7px 6px; font-size: 0.82rem; background: white; text-align: center; }
 .field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(47,111,79,0.25); }
+.field-dlc { flex: 1.15; } /* le champ date natif a besoin d'un peu plus de place */
+.field-lot { flex: 1; }
 
 /* Footer */
 .footer-note { max-width: 900px; margin: 18px auto 0; padding: 0 14px; font-size: 0.78rem; color: var(--muted); }
@@ -371,10 +374,28 @@ h1 { margin: 0; font-size: 1rem; font-weight: 600; }
 .reset-btn:hover { background: #8e1a14; }
 
 /* Responsive mobile */
-@media (max-width: 600px) {
-  .row { grid-template-columns: 36px 1fr 100px 90px; gap: 5px; padding: 8px 8px; }
-  .head-row { grid-template-columns: 36px 1fr 100px 90px; gap: 5px; padding: 4px 8px 0; }
-  .product-input { min-width: 100px; }
-  h1 { font-size: 0.88rem; }
+/* Seuil aligne sur l'iPad en portrait (~768-834px selon modele) : au-dela on garde
+   le layout cote-a-cote (iPad paysage, desktop) ; en-dessous, DLC + Lot passent
+   sous la ligne produit en pleine largeur pour rester confortables au doigt. */
+@media (max-width: 850px) {
+  .row {
+    grid-template-columns: 40px 1fr;
+    grid-template-rows: auto auto;
+    row-gap: 8px;
+    column-gap: 8px;
+    padding: 10px 10px;
+  }
+  .head-row { display: none; } /* les libelles de colonnes n'ont plus de sens en layout empile */
+  .check { grid-column: 1; grid-row: 1; width: 26px; height: 26px; }
+  .prodline { grid-column: 2; grid-row: 1; }
+  .fields { grid-column: 1 / -1; grid-row: 2; gap: 10px; }
+  .field { font-size: 0.95rem; padding: 10px 8px; } /* cibles tactiles confortables au doigt */
+  .product-input { min-width: 100px; font-size: 0.95rem; padding: 8px 10px; }
+  h1 { font-size: 0.92rem; }
+}
+
+@media (max-width: 480px) {
+  h1 { font-size: 0.82rem; }
+  .header-right { gap: 8px; }
 }
 </style>

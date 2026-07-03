@@ -1,11 +1,19 @@
 {
-  "name": "fromagerie-app",
-  "version": "1.0.1",
+  "name": "fromagerie-app-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "build": "npm --prefix frontend install --legacy-peer-deps && npm --prefix frontend run build && npm --prefix backend install",
-    "start": "node backend/src/server.js"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
-  "engines": {
-    "node": ">=20.0.0"
+  "dependencies": {
+    "vue": "^3.4.31",
+    "vue-router": "^4.4.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.5",
+    "vite": "^5.3.1"
   }
 }
