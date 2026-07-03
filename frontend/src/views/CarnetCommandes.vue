@@ -4,7 +4,6 @@
     <!-- HEADER STICKY -->
     <header class="header">
       <div class="header-left">
-        <router-link to="/" class="nav-back">← Accueil</router-link>
         <h1>{{ dateAffichee }} — Carnet de commandes</h1>
       </div>
       <div class="header-right">
