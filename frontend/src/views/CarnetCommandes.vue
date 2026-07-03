@@ -66,22 +66,41 @@
           <!-- Produit -->
           <div class="prodline">
             <span class="qty">{{ ligne.quantite }}<template v-if="ligne.unite"> {{ ligne.unite }}</template></span>
+
             <span v-if="ligne.certitude === 'non_fiable'" class="unsure-label">
               ⚠ ligne brute (chevauchement PDF, à relire) : "{{ ligne.ligne_brute }}"
             </span>
+
             <template v-else>
+              <!-- Designation : surlignee en jaune si incertaine ; clic pour editer -->
+              <span
+                v-if="editId !== ligne.id"
+                :class="['design-text', { unsure: ligne.certitude !== 'haute' }]"
+                @click="editId = ligne.id"
+              >{{ etats[ligne.id]?.produit ?? ligne.designation_brute }}</span>
               <input
+                v-else
                 class="product-input"
                 :class="{ unsure: ligne.certitude !== 'haute' }"
                 :value="etats[ligne.id]?.produit ?? ligne.designation_brute"
                 @input="majEtat(ligne.id, 'produit', $event.target.value)"
+                @blur="editId = null"
               />
+
+              <!-- Reference : tag bracket vert style maquette, clic pour editer -->
+              <span
+                v-if="(ligne.code_interne || ligne.gencod) && editRefId !== ligne.id"
+                class="ref-tag"
+                @click="editRefId = ligne.id"
+              >[{{ etats[ligne.id]?.ref ?? (ligne.code_interne || ligne.gencod) }}]</span>
               <input
-                v-if="ligne.code_interne || ligne.gencod"
+                v-else-if="ligne.code_interne || ligne.gencod"
                 class="ref-input"
                 :value="etats[ligne.id]?.ref ?? (ligne.code_interne || ligne.gencod)"
                 @input="majEtat(ligne.id, 'ref', $event.target.value)"
+                @blur="editRefId = null"
               />
+
               <span v-if="ligne.tarif_net" class="prix-hint">
                 {{ Number(ligne.tarif_net).toFixed(2) }} € / {{ ligne.unite_tarif }}
               </span>
@@ -142,6 +161,8 @@ function fmtDate(d) {
 const commandes = ref([]);
 const chargement = ref(true);
 const etats = reactive({});          // { [ligneId]: { fait, dlc, lot, produit, ref } }
+const editId = ref(null);            // id de la ligne dont la designation est en edition
+const editRefId = ref(null);         // id de la ligne dont la reference est en edition
 const statutMsg = ref('Chargement de l\'historique…');
 const statutClass = ref('');
 
@@ -312,23 +333,33 @@ h1 { margin: 0; font-size: 1rem; font-weight: 600; }
 .row { display: grid; grid-template-columns: 44px 1fr 130px 130px; gap: 8px; align-items: center; padding: 9px 12px; border-bottom: 1px solid var(--line); transition: background 0.15s; }
 .row:last-child { border-bottom: none; }
 .row.done { background: var(--done-bg); }
-.row.done .prodline { opacity: 0.65; }
-.row.done .product-input { text-decoration: line-through; color: #6b7a6b; }
+.row.done .prodline { text-decoration: line-through; color: #6b7a6b; opacity: 0.75; }
 .row.unsure:not(.done) { background: #fffaf0; }
 
 /* Coche */
 .check { width: 30px; height: 30px; accent-color: var(--accent); cursor: pointer; }
 
 /* Produit */
-.prodline { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: 0.92rem; }
-.qty { font-weight: 700; color: var(--ink); margin-right: 4px; white-space: nowrap; }
-.product-input { font-size: 0.92rem; border: 1px solid #cfc8af; border-radius: 6px; padding: 5px 8px; flex: 1; min-width: 140px; background: white; }
+.prodline { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; font-size: 0.92rem; color: #222; }
+.qty { font-weight: 700; color: var(--ink); margin-right: 2px; white-space: nowrap; }
+
+/* Texte de designation : simple par defaut (fidele a la maquette), surligne si incertain, clic pour corriger */
+.design-text { cursor: text; padding: 1px 2px; border-radius: 2px; }
+.design-text.unsure { background: var(--unsure); padding: 0 2px; border-radius: 2px; }
+.design-text:hover { outline: 1px dashed #cfc8af; }
+
+.product-input { font-size: 0.92rem; border: 1px solid var(--accent); border-radius: 6px; padding: 4px 8px; flex: 1; min-width: 140px; background: white; }
 .product-input.unsure { background: var(--unsure); border-color: #d8c400; }
-.product-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
-.ref-input { font-size: 0.78rem; border: 1px solid transparent; background: transparent; padding: 2px 6px; color: var(--prix); width: 80px; border-radius: 4px; }
-.ref-input:focus { border-color: #cfc8af; background: white; outline: none; }
+.product-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
+
+/* Reference : tag bracket vert style maquette "[FBE09]", clic pour corriger */
+.ref-tag { font-size: 0.82rem; color: var(--prix); font-weight: 600; cursor: text; white-space: nowrap; }
+.ref-tag:hover { text-decoration: underline dotted; }
+.ref-input { font-size: 0.82rem; border: 1px solid var(--accent); background: white; padding: 2px 6px; color: var(--prix); width: 90px; border-radius: 4px; }
+.ref-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
+
 .prix-hint { font-size: 0.75rem; color: var(--prix); font-weight: 600; white-space: nowrap; }
-.unsure-label { background: var(--unsure); padding: 2px 6px; border-radius: 4px; font-size: 0.84rem; color: #7a6000; flex: 1; }
+.unsure-label { background: var(--unsure); padding: 2px 6px; border-radius: 4px; font-size: 0.84rem; color: #7a6000; flex: 1; white-space: pre-wrap; }
 
 /* Champs DLC / Lot */
 .field { width: 100%; border: 1px solid #cfc8af; border-radius: 6px; padding: 7px 6px; font-size: 0.82rem; background: white; text-align: center; }
