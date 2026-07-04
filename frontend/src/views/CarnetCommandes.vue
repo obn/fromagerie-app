@@ -28,17 +28,19 @@
 
     <!-- CONTENU -->
     <div v-else class="wrap">
+      <!-- Conteneur a defilement horizontal : aucun retour a la ligne, on glisse au doigt si l'ecran est etroit -->
+      <div class="scroll-x">
+        <div class="scroll-x-inner">
 
-      <!-- En-tête colonnes -->
-      <div class="head-row">
-        <span></span>
-        <span class="col-label">Produit</span>
-        <span class="col-label">DLC</span>
-        <span class="col-label">N° lot</span>
-      </div>
+        <!-- En-tete colonnes -->
+        <div class="head-row">
+          <span></span>
+          <span class="col-label">Produit</span>
+          <span class="col-label">DLC / N° lot</span>
+        </div>
 
-      <!-- BLOC PAR CLIENT -->
-      <div v-for="commande in commandes" :key="commande.id" class="client-block">
+        <!-- BLOC PAR CLIENT -->
+        <div v-for="commande in commandes" :key="commande.id" class="client-block">
         <div class="client-name">
           <span>{{ commande.client_nom }}</span>
           <span class="commande-infos">
@@ -123,6 +125,9 @@
             />
           </div>
         </div>
+
+        </div>
+      </div>
       </div>
 
       <!-- FOOTER -->
@@ -322,7 +327,7 @@ h1 { margin: 0; font-size: 1rem; font-weight: 600; }
 .wrap { max-width: 900px; margin: 0 auto; padding: 8px 14px 0; }
 
 /* En-tête colonnes */
-.head-row { display: grid; grid-template-columns: 44px 1fr 260px; gap: 8px; padding: 4px 12px 0; }
+.head-row { display: grid; grid-template-columns: 44px minmax(280px, max-content) 260px; gap: 8px; padding: 4px 12px 0; }
 .col-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; color: var(--ink); opacity: 0.55; text-align: center; letter-spacing: 0.05em; }
 
 /* Bloc client */
@@ -331,7 +336,7 @@ h1 { margin: 0; font-size: 1rem; font-weight: 600; }
 .commande-infos { font-size: 0.75rem; font-weight: 500; color: var(--muted); }
 
 /* Ligne */
-.row { display: grid; grid-template-columns: 44px 1fr 260px; column-gap: 8px; row-gap: 6px; align-items: center; padding: 9px 12px; border-bottom: 1px solid var(--line); transition: background 0.15s; }
+.row { display: grid; grid-template-columns: 44px minmax(280px, max-content) 260px; column-gap: 8px; align-items: center; padding: 9px 12px; border-bottom: 1px solid var(--line); transition: background 0.15s; }
 .row:last-child { border-bottom: none; }
 .row.done { background: var(--done-bg); }
 .row.done .prodline { text-decoration: line-through; color: #6b7a6b; opacity: 0.75; }
@@ -341,7 +346,7 @@ h1 { margin: 0; font-size: 1rem; font-weight: 600; }
 .check { width: 30px; height: 30px; accent-color: var(--accent); cursor: pointer; }
 
 /* Produit */
-.prodline { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; font-size: 0.92rem; color: #222; }
+.prodline { display: flex; align-items: baseline; flex-wrap: nowrap; white-space: nowrap; gap: 6px; font-size: 0.92rem; color: #222; }
 .qty { font-weight: 700; color: var(--ink); margin-right: 2px; white-space: nowrap; }
 
 /* Texte de designation : simple par defaut (fidele a la maquette), surligne si incertain, clic pour corriger */
@@ -387,26 +392,10 @@ h1 { margin: 0; font-size: 1rem; font-weight: 600; }
 .reset-btn { background: #b3261e; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
 .reset-btn:hover { background: #8e1a14; }
 
-/* Responsive mobile */
-/* Seuil aligne sur l'iPad en portrait (~768-834px selon modele) : au-dela on garde
-   le layout cote-a-cote (iPad paysage, desktop) ; en-dessous, DLC + Lot passent
-   sous la ligne produit en pleine largeur pour rester confortables au doigt. */
-@media (max-width: 850px) {
-  .row {
-    grid-template-columns: 40px 1fr;
-    grid-template-rows: auto auto;
-    row-gap: 8px;
-    column-gap: 8px;
-    padding: 10px 10px;
-  }
-  .head-row { display: none; } /* les libelles de colonnes n'ont plus de sens en layout empile */
-  .check { grid-column: 1; grid-row: 1; width: 26px; height: 26px; }
-  .prodline { grid-column: 2; grid-row: 1; }
-  .fields { grid-column: 1 / -1; grid-row: 2; gap: 10px; }
-  .field { font-size: 0.95rem; padding: 10px 8px; } /* cibles tactiles confortables au doigt */
-  .product-input { min-width: 100px; font-size: 0.95rem; padding: 8px 10px; }
-  h1 { font-size: 0.92rem; }
-}
+/* Defilement horizontal : aucun retour a la ligne, on glisse au doigt si l'ecran
+   est trop etroit pour tout afficher sur une seule ligne (utile en portrait iPad). */
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.scroll-x-inner { min-width: 640px; }
 
 @media (max-width: 480px) {
   h1 { font-size: 0.82rem; }
