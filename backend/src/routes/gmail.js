@@ -85,4 +85,36 @@ router.post('/deplacer-historique', async (req, res) => {
   }
 });
 
+let traitementHistoriqueEnCours = false;
+let dernierRapportHistorique = null;
+
+// POST /api/gmail/traiter-historique?mode=test|prod
+// Traite TOUS les mails du label historique (extraction PDF, parsing, insertion
+// des commandes) — a lancer apres avoir deplace des mails via /deplacer-historique.
+router.post('/traiter-historique', async (req, res) => {
+  if (traitementHistoriqueEnCours) {
+    return res.status(409).json({ error: 'Un traitement de l\'historique est déjà en cours' });
+  }
+
+  const modeForce = req.query.mode || req.body?.mode || null;
+  res.json({ message: 'Traitement de l\'historique démarré', mode: modeForce || 'auto', en_cours: true });
+
+  traitementHistoriqueEnCours = true;
+  try {
+    const { traiterHistorique } = require('../gmail');
+    dernierRapportHistorique = await traiterHistorique(modeForce);
+    dernierRapportHistorique.date = new Date().toISOString();
+  } catch (e) {
+    dernierRapportHistorique = { erreur: e.message, date: new Date().toISOString() };
+    console.error('[gmail route] Erreur traitement historique :', e.message);
+  } finally {
+    traitementHistoriqueEnCours = false;
+  }
+});
+
+// GET /api/gmail/statut-historique
+router.get('/statut-historique', (req, res) => {
+  res.json({ en_cours: traitementHistoriqueEnCours, dernier_rapport: dernierRapportHistorique });
+});
+
 module.exports = router;

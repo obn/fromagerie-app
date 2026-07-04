@@ -87,6 +87,32 @@
       </div>
     </div>
 
+    <!-- Carte de traitement des mails de l'historique (creation des commandes) -->
+    <div class="gmail-card">
+      <div class="gmail-card-head">
+        <div>
+          <h2>Traiter l'historique</h2>
+          <p class="gmail-sub">Extrait les PDF des mails historisés et crée les commandes correspondantes</p>
+        </div>
+        <button class="btn primary" :disabled="historiqueEnCours" @click="lancerTraitementHistorique">
+          {{ historiqueEnCours ? 'Traitement…' : '⚙️ Traiter l\'historique' }}
+        </button>
+      </div>
+
+      <div v-if="historiqueRapport" class="gmail-rapport" :class="{ erreur: historiqueRapport.erreur }">
+        <template v-if="historiqueRapport.erreur">
+          ❌ Erreur : {{ historiqueRapport.erreur }}
+        </template>
+        <template v-else>
+          ✓ {{ historiqueRapport.nbMessages }} mail(s) non lu(s) trouvé(s) dans "{{ historiqueRapport.labelHistorique }}" —
+          {{ historiqueRapport.nbInseres }} commande(s) insérée(s),
+          {{ historiqueRapport.nbDoublons }} doublon(s),
+          {{ historiqueRapport.nbErreurs }} erreur(s)
+          <span class="gmail-date">({{ formatHeure(historiqueRapport.date) }})</span>
+        </template>
+      </div>
+    </div>
+
     <div v-if="chargement" class="etat">Chargement…</div>
     <div v-else class="table-wrap">
       <table>
@@ -167,6 +193,9 @@ const deplacement = reactive({ objet: 'COMMANDE FROMAGERIE', annee: '', mois: ''
 const deplacementEnCours = ref(false);
 const deplacementRapport = ref(null);
 
+const historiqueEnCours = ref(false);
+const historiqueRapport = ref(null);
+
 function formatHeure(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -218,6 +247,36 @@ async function lancerDeplacement() {
     deplacementRapport.value = { error: e.message };
   } finally {
     deplacementEnCours.value = false;
+  }
+}
+
+async function lancerTraitementHistorique() {
+  historiqueEnCours.value = true;
+  historiqueRapport.value = null;
+  try {
+    await api.post('/gmail/traiter-historique?mode=test', {});
+    // Le traitement tourne en arriere-plan cote serveur (peut etre long sur
+    // un gros volume) : on interroge le statut toutes les 2s jusqu'a la fin.
+    await new Promise(resolve => {
+      const interval = setInterval(async () => {
+        try {
+          const statut = await api.get('/gmail/statut-historique');
+          if (!statut.en_cours) {
+            clearInterval(interval);
+            historiqueRapport.value = statut.dernier_rapport;
+            resolve();
+          }
+        } catch (e) {
+          clearInterval(interval);
+          historiqueRapport.value = { erreur: e.message };
+          resolve();
+        }
+      }, 2000);
+    });
+  } catch (e) {
+    historiqueRapport.value = { erreur: e.message };
+  } finally {
+    historiqueEnCours.value = false;
   }
 }
 

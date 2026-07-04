@@ -14,15 +14,19 @@ const { insererCommande } = require('../pdf-parsing/inserer-commande');
 const knex = require('../db/knex');
 
 const LABEL_PAR_DEFAUT = 'commandes validées';
+const LABEL_HISTORIQUE_PAR_DEFAUT = 'Commandes/commandes historisées';
 
-async function getLabelCommandes() {
+async function getParametre(cle, defaut) {
   try {
-    const param = await knex('parametres').where({ cle: 'gmail_label_commandes' }).first();
-    return param?.valeur || LABEL_PAR_DEFAUT;
+    const param = await knex('parametres').where({ cle }).first();
+    return param?.valeur || defaut;
   } catch (e) {
-    return LABEL_PAR_DEFAUT;
+    return defaut;
   }
 }
+
+const getLabelCommandes = () => getParametre('gmail_label_commandes', LABEL_PAR_DEFAUT);
+const getLabelHistorique = () => getParametre('gmail_label_commandes_historisees', LABEL_HISTORIQUE_PAR_DEFAUT);
 
 async function resoudreLabelId(accessToken, nomLabel) {
   const res = await requeteGmailApi(accessToken, '/gmail/v1/users/me/labels');
@@ -32,6 +36,19 @@ async function resoudreLabelId(accessToken, nomLabel) {
     throw new Error(`Label Gmail "${nomLabel}" introuvable. Labels disponibles : ${labels.map(l => l.name).join(', ')}`);
   }
   return label.id;
+}
+
+async function listerTousLesMessages(accessToken, requete) {
+  const messages = [];
+  let pageToken = null;
+  do {
+    const q = encodeURIComponent(requete);
+    const pt = pageToken ? `&pageToken=${pageToken}` : '';
+    const res = await requeteGmailApi(accessToken, `/gmail/v1/users/me/messages?q=${q}&maxResults=100${pt}`);
+    if (res.messages) messages.push(...res.messages);
+    pageToken = res.nextPageToken || null;
+  } while (pageToken);
+  return messages;
 }
 
 async function extrairePiecesJointes(accessToken, messageId) {
@@ -122,6 +139,14 @@ async function traiterMessage(accessToken, messageId) {
   return rapport;
 }
 
+function resumerRapports(rapports) {
+  const nbInseres  = rapports.flatMap(r => r.pdfs).filter(p => p.statut === 'insere').length;
+  const nbDoublons = rapports.flatMap(r => r.pdfs).filter(p => p.statut === 'doublon').length;
+  const nbErreurs  = rapports.flatMap(r => r.erreurs).length;
+  return { nbInseres, nbDoublons, nbErreurs };
+}
+
+// ── Sync standard : mails NON LUS du label "commandes validees" ──────────────
 async function syncGmail(modeForce = null) {
   const { auth, mode, email } = await creerClientAuthentifie(modeForce);
   const accessToken = auth.credentials.access_token;
@@ -131,10 +156,7 @@ async function syncGmail(modeForce = null) {
 
   await resoudreLabelId(accessToken, nomLabel);
 
-  const q = encodeURIComponent(`label:"${nomLabel}" is:unread`);
-  const res = await requeteGmailApi(accessToken, `/gmail/v1/users/me/messages?q=${q}&maxResults=20`);
-
-  const messages = res.messages || [];
+  const messages = await listerTousLesMessages(accessToken, `label:"${nomLabel}" is:unread`);
   console.log(`[gmail] ${messages.length} mail(s) non lu(s)`);
 
   const rapports = [];
@@ -142,13 +164,43 @@ async function syncGmail(modeForce = null) {
     rapports.push(await traiterMessage(accessToken, id));
   }
 
-  const nbInseres  = rapports.flatMap(r => r.pdfs).filter(p => p.statut === 'insere').length;
-  const nbDoublons = rapports.flatMap(r => r.pdfs).filter(p => p.statut === 'doublon').length;
-  const nbErreurs  = rapports.flatMap(r => r.erreurs).length;
-
+  const { nbInseres, nbDoublons, nbErreurs } = resumerRapports(rapports);
   console.log(`[gmail] Terminé — ${nbInseres} insérée(s), ${nbDoublons} doublon(s), ${nbErreurs} erreur(s)`);
 
   return { mode, email, nbMessages: messages.length, nbInseres, nbDoublons, nbErreurs, rapports };
 }
 
-module.exports = { syncGmail };
+// ── Traitement de l'historique : TOUS les mails du label historique ──────────
+// (deja lus pour la plupart, deplaces via la carte "Deplacer les mails
+// historiques" de la page Parametres) — traites par lots en parallele car
+// le volume peut etre important (import massif d'un mois/annee entier).
+async function traiterHistorique(modeForce = null) {
+  const { auth, mode, email } = await creerClientAuthentifie(modeForce);
+  const accessToken = auth.credentials.access_token;
+
+  const nomLabel = await getLabelHistorique();
+  console.log(`[gmail] Traitement historique mode="${mode}" (${email}), label="${nomLabel}"`);
+
+  await resoudreLabelId(accessToken, nomLabel);
+
+  // Seuls les mails NON LUS sont traites : ceux deja lus ont deja ete
+  // importes lors d'un traitement precedent (idempotence, evite les doublons
+  // de traitement meme si le bouton est clique plusieurs fois).
+  const messages = await listerTousLesMessages(accessToken, `label:"${nomLabel}" is:unread`);
+  console.log(`[gmail] ${messages.length} mail(s) non lu(s) dans l'historique`);
+
+  const TAILLE_LOT = 8;
+  const rapports = [];
+  for (let i = 0; i < messages.length; i += TAILLE_LOT) {
+    const lot = messages.slice(i, i + TAILLE_LOT);
+    const rapportsLot = await Promise.all(lot.map(({ id }) => traiterMessage(accessToken, id)));
+    rapports.push(...rapportsLot);
+  }
+
+  const { nbInseres, nbDoublons, nbErreurs } = resumerRapports(rapports);
+  console.log(`[gmail] Historique terminé — ${nbInseres} insérée(s), ${nbDoublons} doublon(s), ${nbErreurs} erreur(s)`);
+
+  return { mode, email, labelHistorique: nomLabel, nbMessages: messages.length, nbInseres, nbDoublons, nbErreurs, rapports };
+}
+
+module.exports = { syncGmail, traiterHistorique };

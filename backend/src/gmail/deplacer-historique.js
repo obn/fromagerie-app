@@ -128,7 +128,10 @@ async function deplacerVersHistorique({ mode = 'test', requete, dryRun = false }
     if (!dryRun) {
       await requeteGmailApi(accessToken, `/gmail/v1/users/me/messages/${id}/modify`, {
         method: 'POST',
-        body: { removeLabelIds: ['INBOX'], addLabelIds: [labelId] },
+        // On force UNREAD ici : meme si le mail etait deja lu, on veut qu'il
+        // soit repere par le traitement de l'historique (qui ne traite que
+        // les mails non lus, pour ne jamais re-traiter deux fois le meme mail).
+        body: { removeLabelIds: ['INBOX'], addLabelIds: [labelId, 'UNREAD'] },
       });
     }
     return { sujet, action: 'deplace' };
