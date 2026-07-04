@@ -2,6 +2,8 @@
  * Insère en base une commande parsée par les parsers PDF.
  * - Résout le client via son nom (colonne clients.nom)
  * - Evite les doublons via (client_id, numero_commande)
+ * - Résout le code interne par libellé si absent du PDF (rapprochement texte
+ *   contre le catalogue interne ref_produits_internes)
  * - Résout produit_id via codes_internes si disponible
  * - Calcule la date de livraison réelle à partir du jour fixe du client
  *   (clients.jour_fixe_livraison), PAS depuis la date lue dans le PDF —
@@ -42,6 +44,80 @@ function calculerDateLivraison(dateAncrage, jourFixeLivraison) {
   resultat.setDate(resultat.getDate() + decalage);
 
   return resultat.toISOString().slice(0, 10);
+}
+
+/**
+ * Normalise un libellé pour comparaison texte : majuscules, sans accents,
+ * espaces multiples réduits à un seul, sans espaces de bord.
+ */
+function normaliser(s) {
+  return (s || '')
+    .toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // retire les accents
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Mots trop generiques pour compter dans la comparaison (bruit, pas de valeur discriminante)
+const MOTS_VIDES = new Set([
+  'DE', 'DU', 'DES', 'LA', 'LE', 'LES', 'ET', 'A', 'AU', 'AUX', 'EN',
+  'KG', 'GR', 'G', 'PC', 'PCB', 'X', 'ENVIRON', 'CARTON', 'VRAC',
+]);
+
+function tokeniser(s) {
+  return normaliser(s)
+    .split(/[^A-Z0-9]+/)
+    .filter(t => t.length >= 2 && !MOTS_VIDES.has(t));
+}
+
+/**
+ * Cherche dans le catalogue interne (ref_produits_internes) le code dont le
+ * libellé correspond le mieux à la désignation fournie par le PDF.
+ *
+ * Stratégie en 2 temps :
+ *  1. Correspondance exacte (normalisée) — confiance haute
+ *  2. Similarité par tokens communs (mots significatifs partagés, hors mots
+ *     vides comme "DE"/"KG"/"CARTON") — tolère un ordre des mots different,
+ *     des mots en plus ("SEAU", "ABBAYE DES DOMBES") ou des abreviations
+ *     d'unite legerement differentes. Confiance partielle, exigee a au moins
+ *     2 mots significatifs communs et 60% de recouvrement du plus petit set.
+ *
+ * @param {string} designation - texte brut du PDF
+ * @param {Array<{code_interne: string, libelle_produit: string}>} catalogue
+ * @returns {{code: string, confiance: 'exacte'|'partielle'} | null}
+ */
+function trouverCodeParLibelle(designation, catalogue) {
+  const d = normaliser(designation);
+  if (!d) return null;
+
+  const exact = catalogue.find(r => normaliser(r.libelle_produit) === d);
+  if (exact) return { code: exact.code_interne, confiance: 'exacte' };
+
+  const tokensDesignation = new Set(tokeniser(designation));
+  if (tokensDesignation.size === 0) return null;
+
+  let meilleur = null;
+  let meilleurScore = 0;
+
+  for (const r of catalogue) {
+    const tokensLibelle = tokeniser(r.libelle_produit);
+    if (tokensLibelle.length === 0) continue;
+
+    const communs = tokensLibelle.filter(t => tokensDesignation.has(t));
+    if (communs.length < 2) continue; // au moins 2 mots significatifs communs
+
+    const scoreRecouvrement = communs.length / Math.min(tokensDesignation.size, tokensLibelle.length);
+    if (scoreRecouvrement < 0.6) continue; // au moins 60% de recouvrement du plus petit ensemble
+
+    // Score global : privilegie le meilleur recouvrement, puis le plus de mots communs
+    const score = scoreRecouvrement * 100 + communs.length;
+    if (score > meilleurScore) {
+      meilleurScore = score;
+      meilleur = r;
+    }
+  }
+
+  return meilleur ? { code: meilleur.code_interne, confiance: 'partielle' } : null;
 }
 
 async function insererCommande(commande, options = {}) {
@@ -95,14 +171,34 @@ async function insererCommande(commande, options = {}) {
     fichier_pdf_url:          fichierPdfUrl,
   });
 
+  // ── Chargement du catalogue interne une seule fois (table restreinte) ─────
+  // Utilisé pour deduire le code_interne quand le PDF n'en fournit aucun.
+  const catalogueInterne = await knex('ref_produits_internes').select('code_interne', 'libelle_produit');
+
   // ── Insertion lignes ──────────────────────────────────────────────────────
   let nbResolues = 0;
+  let nbDeduitsParLibelle = 0;
 
   for (const ligne of commande.lignes || []) {
+    let codeInterne = ligne.codeInterne || null;
+    let certitude = ligne.certitude || 'a_verifier';
+
+    // Deduction du code interne par rapprochement texte si absent du PDF
+    if (!codeInterne && !ligne.gencod && ligne.designationBrute) {
+      const trouve = trouverCodeParLibelle(ligne.designationBrute, catalogueInterne);
+      if (trouve) {
+        codeInterne = trouve.code;
+        nbDeduitsParLibelle++;
+        // Une deduction reste une supposition : on ne remonte jamais la certitude
+        // au-dessus de "a_verifier", meme si le texte matchait exactement.
+        if (certitude === 'haute') certitude = 'a_verifier';
+      }
+    }
+
     let produitId = null;
-    if (ligne.codeInterne) {
+    if (codeInterne) {
       const ci = await knex('codes_internes')
-        .where({ client_id: client.id, code_interne: ligne.codeInterne })
+        .where({ client_id: client.id, code_interne: codeInterne })
         .first();
       if (ci?.produit_id) { produitId = ci.produit_id; nbResolues++; }
     }
@@ -113,23 +209,28 @@ async function insererCommande(commande, options = {}) {
 
     await knex('lignes_commande').insert({
       commande_id:       commandeId,
-      code_interne:      ligne.codeInterne      || null,
+      code_interne:      codeInterne             || null,
       produit_id:        produitId,
-      designation_brute: ligne.designationBrute || null,
-      quantite:          ligne.quantite          || null,
-      unite:             ligne.unite             || null,
-      certitude:         ligne.certitude         || 'a_verifier',
-      ligne_brute:       ligne.ligneBrute        || null,
+      designation_brute: ligne.designationBrute  || null,
+      quantite:          ligne.quantite           || null,
+      unite:             ligne.unite              || null,
+      certitude,
+      ligne_brute:       ligne.ligneBrute         || null,
     });
   }
 
   console.log(
     `[import] Commande ${commande.numeroCommande} (${commande.client}) insérée — ` +
     `livraison calculée : ${dateLivraisonCalculee || 'non déterminée'} — ` +
-    `${commande.lignes.length} ligne(s), ${nbResolues} résolu(s) automatiquement`
+    `${commande.lignes.length} ligne(s), ${nbResolues} résolu(s), ${nbDeduitsParLibelle} code(s) déduit(s) par libellé`
   );
 
-  return { doublon: false, commandeId, nbLignes: commande.lignes.length, nbResolues, dateLivraisonCalculee };
+  return {
+    doublon: false, commandeId,
+    nbLignes: commande.lignes.length,
+    nbResolues, nbDeduitsParLibelle,
+    dateLivraisonCalculee,
+  };
 }
 
-module.exports = { insererCommande, calculerDateLivraison };
+module.exports = { insererCommande, calculerDateLivraison, trouverCodeParLibelle, normaliser };

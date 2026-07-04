@@ -91,21 +91,32 @@ function parserDistral(texte) {
   const idxDebutTableau = texte.search(/montant\s*\n/i);
   const zoneTableau = idxDebutTableau >= 0 ? texte.slice(idxDebutTableau) : texte;
 
-  // Chaque bloc produit commence par : code interne Distral (4-6 chiffres) + notre ref (alphanumerique)
-  const regBloc = /(\d{4,6})\s+([A-Z0-9]{3,10})\s+([\s\S]*?)(?=\n?\d{4,6}\s+[A-Z0-9]{3,10}\s|$)/g;
+  // Chaque bloc produit commence par le code interne Distral (4-6 chiffres).
+  // La "votre ref" (notre code, ex: FBN08) qui suit est OPTIONNELLE — certains
+  // envois Distral ne la fournissent pas pour toutes les lignes.
+  const regBloc = /(\d{4,6})\s+([\s\S]*?)(?=\n?\d{4,6}\s|$)/g;
   let m;
   while ((m = regBloc.exec(zoneTableau)) !== null) {
-    const votreRef = m[2].trim();  // ex: FBE09 (notre code interne, cle de resolution)
-    const reste = m[3].trim();
+    let blocRestant = m[2];
 
-    // Le "reste" contient : designation (plusieurs lignes) puis une ligne
+    // La "votre ref" suit un pattern strict lettres+chiffres (ex: FBN08, FBE09).
+    // Un mot de designation comme "BOUCHON" (que des lettres, pas de chiffre)
+    // ne doit JAMAIS etre confondu avec une reference.
+    let votreRef = null;
+    const mRef = blocRestant.match(/^([A-Z]{2,5}\d{1,4})\s+/);
+    if (mRef) {
+      votreRef = mRef[1];
+      blocRestant = blocRestant.slice(mRef[0].length);
+    }
+
+    // Le reste contient : designation (plusieurs lignes) puis une ligne
     // "DLC_DATE  QUANTITE  UNITE  POIDS" qui marque la fin de la designation.
-    const mDlcQte = reste.match(/(\d{2}\/\d{2}\/\d{2})\s+(\d+(?:[.,]\d+)?)\s+(\w+)\s+([\d,]+)/);
+    const mDlcQte = blocRestant.match(/(\d{2}\/\d{2}\/\d{2})\s+(\d+(?:[.,]\d+)?)\s+(\w+)\s+([\d,]+)/);
 
     // Sans ce motif, le bloc capture n'est pas une vraie ligne produit (faux positif) — on l'ignore.
     if (!mDlcQte) continue;
 
-    const designation = reste.slice(0, mDlcQte.index).replace(/\s*\n\s*/g, ' ').trim();
+    const designation = blocRestant.slice(0, mDlcQte.index).replace(/\s*\n\s*/g, ' ').trim();
     const poidsFacture = parseQte(mDlcQte[4]); // ex: 5,000 (kg factures)
     const quantiteColis = parseQte(mDlcQte[2]);
     const uniteColis = mDlcQte[3]; // ex: COL
@@ -113,13 +124,15 @@ function parserDistral(texte) {
     if (!designation) continue;
 
     lignes.push({
-      codeInterne: votreRef,
+      codeInterne: votreRef, // null si absente du PDF -> deduite plus tard par rapprochement de libelle
       gencod: null,
       designationBrute: designation,
       // Le poids facture (KG) est plus parlant en production que le nombre de colis
       quantite: poidsFacture ?? quantiteColis,
       unite: poidsFacture ? 'KG' : uniteColis,
-      certitude: 'haute',
+      // Certitude "a_verifier" (au lieu de "haute") quand la reference est absente :
+      // la ligne repose alors sur une deduction texte, a confirmer manuellement.
+      certitude: votreRef ? 'haute' : 'a_verifier',
       ligneBrute: m[0].trim(),
     });
   }
