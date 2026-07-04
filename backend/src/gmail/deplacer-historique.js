@@ -110,19 +110,19 @@ async function deplacerVersHistorique({ mode = 'test', requete, dryRun = false }
 
   const messages = await listerTousLesMessages(accessToken, requete);
 
-  let nbDeplaces = 0;
-  let nbIgnores = 0;
-  const details = [];
+  // Traitement par lots en parallele (au lieu d'un mail a la fois) pour
+  // accelerer significativement sur de gros volumes, tout en restant a une
+  // taille de lot raisonnable pour ne pas depasser les quotas de l'API Gmail.
+  const TAILLE_LOT = 8;
+  const resultats = [];
 
-  for (const { id } of messages) {
+  async function traiterUnMessage({ id }) {
     const msg = await requeteGmailApi(accessToken, `/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject`);
     const sujet = msg.payload?.headers?.find(h => h.name === 'Subject')?.value || '(sans objet)';
     const dansInbox = (msg.labelIds || []).includes('INBOX');
 
     if (!dansInbox) {
-      nbIgnores++;
-      details.push({ sujet, action: 'ignore' });
-      continue;
+      return { sujet, action: 'ignore' };
     }
 
     if (!dryRun) {
@@ -131,9 +131,18 @@ async function deplacerVersHistorique({ mode = 'test', requete, dryRun = false }
         body: { removeLabelIds: ['INBOX'], addLabelIds: [labelId] },
       });
     }
-    nbDeplaces++;
-    details.push({ sujet, action: 'deplace' });
+    return { sujet, action: 'deplace' };
   }
+
+  for (let i = 0; i < messages.length; i += TAILLE_LOT) {
+    const lot = messages.slice(i, i + TAILLE_LOT);
+    const resultatsLot = await Promise.all(lot.map(traiterUnMessage));
+    resultats.push(...resultatsLot);
+  }
+
+  const details = resultats;
+  const nbDeplaces = details.filter(d => d.action === 'deplace').length;
+  const nbIgnores = details.filter(d => d.action === 'ignore').length;
 
   return {
     email, labelDestination: nomLabelHistorique,
