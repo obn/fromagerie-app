@@ -13,7 +13,8 @@
     "seed": "knex seed:run",
     "import:referentiel": "node src/import/import-referentiel.js",
     "import:ref-produits": "node src/import/import-ref-produits.js",
-    "gmail:setup": "node src/gmail/auth.js --setup"
+    "gmail:setup": "node src/gmail/auth.js --setup",
+    "gmail:deplacer": "node src/gmail/deplacer-vers-inbox.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

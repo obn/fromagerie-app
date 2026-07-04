@@ -34,6 +34,59 @@
       </div>
     </div>
 
+    <!-- Carte de deplacement des mails traites vers le label historique -->
+    <div class="gmail-card">
+      <div class="gmail-card-head">
+        <div>
+          <h2>Déplacer les mails historiques</h2>
+          <p class="gmail-sub">Importer dans le SI les mails avant automatisation de la saisie des commandes</p>
+        </div>
+      </div>
+
+      <div class="deplacement-filtres">
+        <input v-model="deplacement.objet" placeholder="Objet contient…" class="inp-inline" />
+        <select v-model="deplacement.annee" class="inp-inline">
+          <option value="">Toutes années</option>
+          <option v-for="a in anneesDisponibles" :key="a" :value="a">{{ a }}</option>
+        </select>
+        <select v-model="deplacement.mois" class="inp-inline" :disabled="!deplacement.annee">
+          <option value="">Tous mois</option>
+          <option v-for="m in moisDisponibles" :key="m.v" :value="m.v">{{ m.l }}</option>
+        </select>
+        <select v-model="deplacement.jour" class="inp-inline" :disabled="!deplacement.mois">
+          <option value="">Tous jours</option>
+          <option v-for="j in 31" :key="j" :value="j">{{ j }}</option>
+        </select>
+      </div>
+
+      <div class="deplacement-actions">
+        <label class="check-inline">
+          <input type="checkbox" v-model="deplacement.dryRun" />
+          Aperçu seulement (ne rien modifier)
+        </label>
+        <button class="btn secondary" :disabled="deplacementEnCours" @click="lancerDeplacement">
+          {{ deplacementEnCours ? 'Traitement…' : (deplacement.dryRun ? '👁 Aperçu' : '📤 Déplacer') }}
+        </button>
+      </div>
+
+      <div v-if="deplacementRapport" class="gmail-rapport" :class="{ erreur: deplacementRapport.error }">
+        <template v-if="deplacementRapport.error">
+          ❌ Erreur : {{ deplacementRapport.error }}
+        </template>
+        <template v-else>
+          ✓ {{ deplacementRapport.nbTrouves }} mail(s) trouvé(s) —
+          {{ deplacementRapport.nbDeplaces }} déplacé(s) vers "{{ deplacementRapport.labelDestination }}",
+          {{ deplacementRapport.nbIgnores }} ignoré(s)
+          <span v-if="deplacementRapport.dryRun" class="gmail-date">(aperçu — rien n'a été modifié)</span>
+        </template>
+        <ul v-if="deplacementRapport.details?.length" class="deplacement-details">
+          <li v-for="(d, i) in deplacementRapport.details" :key="i" :class="d.action">
+            {{ d.action === 'deplace' ? '→' : '=' }} {{ d.sujet }}
+          </li>
+        </ul>
+      </div>
+    </div>
+
     <div v-if="chargement" class="etat">Chargement…</div>
     <div v-else class="table-wrap">
       <table>
@@ -89,7 +142,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { api } from '../services/api';
 
 const parametres = ref([]);
@@ -100,6 +153,19 @@ const confirm = ref(null);
 const ajout = ref(null);
 const syncEnCours = ref(false);
 const syncRapport = ref(null);
+
+const anneeActuelle = new Date().getFullYear();
+const anneesDisponibles = [anneeActuelle - 1, anneeActuelle, anneeActuelle + 1];
+const moisDisponibles = [
+  { v: 1, l: 'Janvier' }, { v: 2, l: 'Février' }, { v: 3, l: 'Mars' },
+  { v: 4, l: 'Avril' }, { v: 5, l: 'Mai' }, { v: 6, l: 'Juin' },
+  { v: 7, l: 'Juillet' }, { v: 8, l: 'Août' }, { v: 9, l: 'Septembre' },
+  { v: 10, l: 'Octobre' }, { v: 11, l: 'Novembre' }, { v: 12, l: 'Décembre' },
+];
+
+const deplacement = reactive({ objet: 'COMMANDE', annee: '', mois: '', jour: '', dryRun: true });
+const deplacementEnCours = ref(false);
+const deplacementRapport = ref(null);
 
 function formatHeure(iso) {
   if (!iso) return '';
@@ -133,6 +199,25 @@ async function lancerSync() {
     syncRapport.value = { erreur: e.message };
   } finally {
     syncEnCours.value = false;
+  }
+}
+
+async function lancerDeplacement() {
+  deplacementEnCours.value = true;
+  deplacementRapport.value = null;
+  try {
+    deplacementRapport.value = await api.post('/gmail/deplacer-historique', {
+      objet: deplacement.objet || undefined,
+      annee: deplacement.annee || undefined,
+      mois: deplacement.mois || undefined,
+      jour: deplacement.jour || undefined,
+      mode: 'test',
+      dryRun: deplacement.dryRun,
+    });
+  } catch (e) {
+    deplacementRapport.value = { error: e.message };
+  } finally {
+    deplacementEnCours.value = false;
   }
 }
 
@@ -188,6 +273,20 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .gmail-rapport.erreur { background: #fde8e8; color: #b3261e; }
 .gmail-date { color: #7a8898; font-size: 0.78rem; margin-left: 6px; }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn.secondary { background: #f0ece0; color: #1a2a4a; }
+.btn.secondary:hover:not(:disabled) { background: #e5dfd0; }
+
+.deplacement-filtres { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.inp-inline { padding: 7px 10px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.85rem; background: white; }
+.inp-inline:disabled { background: #f5f2e8; color: #a89b7a; }
+
+.deplacement-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; flex-wrap: wrap; gap: 10px; }
+.check-inline { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #5a6070; cursor: pointer; }
+
+.deplacement-details { list-style: none; margin: 10px 0 0; padding: 0; max-height: 200px; overflow-y: auto; border-top: 1px solid rgba(0,0,0,0.08); }
+.deplacement-details li { padding: 4px 0; font-size: 0.8rem; }
+.deplacement-details li.deplace { color: #2f6f4f; }
+.deplacement-details li.ignore { color: #9a9488; }
 .table-wrap { background: white; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
 table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 0.875rem; }
 thead { background: #f5f2e8; }

@@ -55,4 +55,34 @@ router.get('/mode', async (req, res) => {
   }
 });
 
+// POST /api/gmail/deplacer-historique
+// Body : { annee, mois, jour, objet, mode, dryRun }
+// annee/mois/jour sont optionnels et combinables (voir construireRequete) :
+//   - annee+mois+jour -> une seule journee
+//   - annee+mois      -> un mois entier
+//   - annee seule     -> une annee entiere
+//   - objet seul (aucune date) -> tous les mails correspondant a l'objet, sans limite de date
+router.post('/deplacer-historique', async (req, res) => {
+  try {
+    const { annee, mois, jour, objet, mode, dryRun } = req.body;
+    const { construireRequete, deplacerVersHistorique } = require('../gmail/deplacer-historique');
+
+    const requete = construireRequete({
+      annee: annee ? parseInt(annee, 10) : null,
+      mois: mois ? parseInt(mois, 10) : null,
+      jour: jour ? parseInt(jour, 10) : null,
+      objet: objet || 'COMMANDE',
+    });
+
+    if (!requete.trim()) {
+      return res.status(400).json({ error: 'Aucun critere fourni (objet ou date requis)' });
+    }
+
+    const rapport = await deplacerVersHistorique({ mode: mode || 'test', requete, dryRun: !!dryRun });
+    res.json(rapport);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
