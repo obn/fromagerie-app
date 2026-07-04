@@ -49,7 +49,9 @@
           </span>
         </div>
 
-        <!-- LIGNES -->
+        <!-- LIGNES : conteneur "table" pour un alignement de colonnes stable, -->
+        <!-- indépendant de la longueur du texte de chaque ligne individuelle -->
+        <div class="rows-table">
         <div
           v-for="ligne in commande.lignes"
           :key="ligne.id"
@@ -126,7 +128,9 @@
         </div>
 
         </div>
-      </div>
+        </div>
+
+        </div>
       </div>
 
       <!-- FOOTER -->
@@ -312,18 +316,28 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 }
 .commande-infos { font-size: 0.75rem; font-weight: 500; color: #7a8898; }
 
-/* Ligne */
-.row { display: grid; grid-template-columns: 44px minmax(280px, max-content) 260px; column-gap: 24px; align-items: center; padding: 10px 14px; border-bottom: 1px solid #f0ece0; transition: background 0.15s; }
-.row:last-child { border-bottom: none; border-radius: 0 0 10px 10px; }
-.row:hover { background: #faf8f2; }
-.row.done { background: #eef6ec; }
-.row.done:hover { background: #e6f2e3; }
+/* Lignes : display:table plutot que grid par ligne. Avantage cle : la largeur
+   des colonnes est calculee UNE FOIS pour tout le bloc client (sur la base du
+   contenu le plus large), donc les colonnes DLC/Lot restent parfaitement
+   alignees entre toutes les lignes, quelle que soit la longueur du libelle
+   produit de chacune — contrairement a un grid independant par ligne. */
+.rows-table { display: table; width: 100%; table-layout: auto; border-collapse: collapse; }
+.row { display: table-row; }
+.row > * { display: table-cell; vertical-align: middle; padding: 10px 14px; border-bottom: 1px solid #f0ece0; }
+.row:last-child > * { border-bottom: none; }
+.row:hover > * { background: #faf8f2; }
+.row.done > * { background: #eef6ec; }
+.row.done:hover > * { background: #e6f2e3; }
 .row.done .prodline { text-decoration: line-through; color: #7a8a7a; opacity: 0.75; }
-.row.unsure:not(.done) { background: #fffaf0; border-left: 3px solid #d8c400; }
-.row.unsure:not(.done):hover { background: #fff5e0; }
+.row.unsure:not(.done) > *:first-child { border-left: 3px solid #d8c400; }
+.row.unsure:not(.done) > * { background: #fffaf0; }
+.row.unsure:not(.done):hover > * { background: #fff5e0; }
+.rows-table .row:last-child > *:first-child { border-radius: 0 0 0 10px; }
+.rows-table .row:last-child > *:last-child { border-radius: 0 0 10px 0; }
 
 /* Coche */
 .check { width: 26px; height: 26px; accent-color: #2f6f4f; cursor: pointer; }
+.row > .check { width: 26px; } /* largeur de colonne stable, identique sur toutes les lignes */
 
 /* Produit */
 .prodline { display: flex; align-items: baseline; flex-wrap: nowrap; white-space: nowrap; gap: 6px; font-size: 0.9rem; color: #222; margin-right: 8px; }
@@ -347,7 +361,7 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .unsure-label { background: #fff3a0; padding: 4px 8px; border-radius: 4px; font-size: 0.82rem; font-weight: 600; color: #7a6000; flex: 1; white-space: pre-wrap; box-shadow: inset 0 0 0 1px #d8c400; }
 
 /* Champs DLC / Lot : meme style d'input que les autres pages (bordure claire, focus vert) */
-.fields { display: flex; gap: 8px; min-width: 0; }
+.fields { display: flex; gap: 8px; min-width: 0; width: 260px; }
 .field {
   width: 100%; min-width: 0;
   border: 1px solid #d0cbb8;
