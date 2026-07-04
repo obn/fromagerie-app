@@ -1,22 +1,21 @@
 <template>
-  <div class="carnet">
-
-    <!-- HEADER STICKY -->
-    <header class="header">
-      <div class="header-left">
-        <h1>{{ dateAffichee }} — Carnet de commandes</h1>
+  <div class="page">
+    <div class="page-header">
+      <div>
+        <h1>Carnet du jour</h1>
+        <p class="subtitle">{{ dateAffichee }}</p>
       </div>
-      <div class="header-right">
-        <input type="date" v-model="dateSelectionnee" @change="charger" class="date-picker" />
-        <span class="progress">{{ nbFait }} / {{ nbTotal }} fait</span>
+      <div class="toolbar">
+        <input type="date" v-model="dateSelectionnee" @change="charger" class="sel" />
+        <span class="count-badge">{{ nbFait }} / {{ nbTotal }} fait</span>
       </div>
-    </header>
+    </div>
 
-    <div class="statut-bar" :class="statutClass">{{ statutMsg }}</div>
+    <p class="statut-line" :class="statutClass" v-if="statutMsg">{{ statutMsg }}</p>
 
-    <div class="legend">
+    <div class="legend" v-if="nbTotal > 0">
       <span><span class="swatch unsure"></span> à vérifier (lecture PDF incertaine)</span>
-      <span v-if="nbTotal > 0">{{ nbTotal }} ligne(s) de commande</span>
+      <span>{{ nbTotal }} ligne(s) de commande</span>
     </div>
 
     <!-- CHARGEMENT / VIDE -->
@@ -275,131 +274,104 @@ onMounted(charger);
 </script>
 
 <style scoped>
-/* ── Variables ── */
-:root {
-  --paper:    #fffdf8;
-  --ink:      #0f2138;
-  --unsure:   #ffe066;
-  --unsure-border: #c9a300;
-  --muted:    #6b6455;
-  --line:     #d8d0ba;
-  --done-bg:  #e3f2e6;
-  --accent:   #22633f;
-  --prix:     #2f6b47;
-  --field-border: #a89b7a;
-}
+/* Palette identique aux autres pages (Commandes, Referentiels, Parametres) */
+.page { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
+.page-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
+.subtitle { margin: 2px 0 0; color: #7a8898; font-size: 0.85rem; text-transform: capitalize; }
 
-.carnet { background: #e7e2d3; min-height: 100vh; padding-bottom: 80px; }
+.toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sel { padding: 7px 10px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.85rem; background: white; }
+.count-badge { background: #eef6ec; color: #2f6f4f; font-weight: 700; font-size: 0.82rem; padding: 5px 12px; border-radius: 20px; white-space: nowrap; }
 
-/* Header */
-.header {
-  position: sticky; top: 0; z-index: 10;
-  background: var(--ink); color: white;
-  padding: 12px 18px;
-  display: flex; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; gap: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-}
-.header-left { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.header-right { display: flex; align-items: center; gap: 12px; }
-.nav-back { color: white; text-decoration: none; font-weight: 600; font-size: 0.9rem; opacity: 0.85; }
-.nav-back:hover { opacity: 1; }
-h1 { margin: 0; font-size: 1rem; font-weight: 600; }
-.progress { font-size: 0.85rem; opacity: 0.85; white-space: nowrap; }
-.date-picker { border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: white; border-radius: 6px; padding: 4px 8px; font-size: 0.82rem; cursor: pointer; }
-.date-picker::-webkit-calendar-picker-indicator { filter: invert(1); }
+.statut-line { max-width: 1100px; margin: -8px 0 12px; font-size: 0.78rem; color: #2f6f4f; text-align: right; }
+.statut-line.erreur { color: #b3261e; }
 
-/* Statut */
-.statut-bar { max-width: 900px; margin: 6px auto 0; padding: 2px 14px; font-size: 0.78rem; color: var(--accent); text-align: right; min-height: 20px; }
-.statut-bar.erreur { color: #b3261e; }
-.statut-bar.ok { color: var(--accent); }
+.legend { margin: 0 0 14px; font-size: 0.8rem; color: #7a8898; display: flex; gap: 16px; flex-wrap: wrap; }
+.swatch { display: inline-block; width: 11px; height: 11px; border-radius: 2px; border: 1px solid #d8c400; margin-right: 4px; vertical-align: middle; background: #fff3a0; }
 
-/* Légende */
-.legend { max-width: 900px; margin: 8px auto 4px; padding: 0 14px; font-size: 0.8rem; color: var(--muted); display: flex; gap: 16px; flex-wrap: wrap; }
-.swatch { display: inline-block; width: 11px; height: 11px; border-radius: 2px; border: 1px solid #d8c400; margin-right: 4px; vertical-align: middle; }
-.swatch.unsure { background: var(--unsure); }
-
-/* États */
-.etat { max-width: 900px; margin: 40px auto; padding: 0 14px; text-align: center; color: var(--muted); }
+.etat { padding: 40px; text-align: center; color: #7a8898; }
 .hint { font-size: 0.85rem; display: block; margin-top: 8px; }
-
-/* Wrap */
-.wrap { max-width: 900px; margin: 0 auto; padding: 8px 14px 0; }
-
-/* En-tête colonnes */
-.head-row { display: grid; grid-template-columns: 44px minmax(280px, max-content) 260px; column-gap: 24px; padding: 4px 12px 0; }
-.col-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; color: var(--ink); opacity: 0.55; text-align: center; letter-spacing: 0.05em; }
-
-/* Bloc client */
-.client-block { background: var(--paper); border-radius: 10px; margin-bottom: 16px; box-shadow: 0 1px 6px rgba(0,0,0,0.12); }
-.client-name { font-weight: 800; color: var(--ink); font-size: 1.05rem; padding: 12px 14px; background: #ece4c8; border-bottom: 2px solid var(--line); border-radius: 10px 10px 0 0; display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
-.commande-infos { font-size: 0.75rem; font-weight: 500; color: var(--muted); }
-
-/* Ligne */
-.row { display: grid; grid-template-columns: 44px minmax(280px, max-content) 260px; column-gap: 24px; align-items: center; padding: 9px 12px; border-bottom: 1px solid var(--line); transition: background 0.15s; }
-.row:last-child { border-radius: 0 0 10px 10px; }
-.row:last-child { border-bottom: none; }
-.row.done { background: var(--done-bg); }
-.row.done .prodline { text-decoration: line-through; color: #6b7a6b; opacity: 0.75; }
-.row.unsure:not(.done) { background: #fff9e8; border-left: 3px solid var(--unsure-border); }
-
-/* Coche */
-.check { width: 30px; height: 30px; accent-color: var(--accent); cursor: pointer; }
-
-/* Produit */
-.prodline { display: flex; align-items: baseline; flex-wrap: nowrap; white-space: nowrap; gap: 6px; font-size: 0.92rem; color: #222; margin-right: 8px; }
-.qty { font-weight: 700; color: var(--ink); margin-right: 2px; white-space: nowrap; }
-
-/* Texte de designation : simple par defaut (fidele a la maquette), surligne si incertain, clic pour corriger */
-.design-text { cursor: text; padding: 1px 3px; border-radius: 3px; color: #1a1a1a; }
-.design-text.unsure { background: var(--unsure); padding: 1px 5px; border-radius: 3px; font-weight: 600; box-shadow: inset 0 0 0 1px var(--unsure-border); }
-.design-text:hover { outline: 1px dashed var(--field-border); }
-
-.product-input { font-size: 0.92rem; border: 1px solid var(--accent); border-radius: 6px; padding: 4px 8px; flex: 1; min-width: 140px; background: white; }
-.product-input.unsure { background: var(--unsure); border-color: #d8c400; }
-.product-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
-
-/* Reference : tag bracket vert style maquette "[FBE09]", clic pour corriger */
-.ref-tag { font-size: 0.82rem; color: var(--prix); font-weight: 700; cursor: text; white-space: nowrap; background: #e3f2e6; padding: 1px 6px; border-radius: 4px; }
-.ref-tag:hover { text-decoration: underline dotted; }
-.ref-input { font-size: 0.82rem; border: 1px solid var(--accent); background: white; padding: 2px 6px; color: var(--prix); width: 90px; border-radius: 4px; }
-.ref-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
-
-.prix-hint { font-size: 0.75rem; color: var(--prix); font-weight: 600; white-space: nowrap; }
-.unsure-label { background: var(--unsure); padding: 4px 8px; border-radius: 4px; font-size: 0.84rem; font-weight: 600; color: #5c4700; flex: 1; white-space: pre-wrap; box-shadow: inset 0 0 0 1px var(--unsure-border); }
-
-/* Champs DLC / Lot */
-.fields { display: flex; gap: 8px; min-width: 0; }
-.field {
-  width: 100%; min-width: 0;
-  border: 1.5px solid var(--field-border);
-  border-radius: 6px;
-  padding: 7px 8px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--ink);
-  background: white;
-  text-align: center;
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
-}
-.field::placeholder { color: #a89b7a; font-weight: 500; }
-.field:hover { border-color: var(--accent); }
-.field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(34,99,63,0.18); }
-.field-dlc { flex: 1.15; } /* le champ date natif a besoin d'un peu plus de place */
-.field-lot { flex: 1; }
-
-/* Footer */
-.footer-note { max-width: 900px; margin: 18px auto 0; padding: 0 14px; font-size: 0.78rem; color: var(--muted); }
-.reset-btn { background: #b3261e; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
-.reset-btn:hover { background: #8e1a14; }
 
 /* Defilement horizontal : aucun retour a la ligne, on glisse au doigt si l'ecran
    est trop etroit pour tout afficher sur une seule ligne (utile en portrait iPad). */
 .scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .scroll-x-inner { min-width: 640px; }
 
+/* En-tete colonnes : meme style que les th des tables des autres pages */
+.head-row { display: grid; grid-template-columns: 44px minmax(280px, max-content) 260px; column-gap: 24px; padding: 0 14px 6px; }
+.col-label { font-size: 0.71rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #5a6070; }
+
+/* Bloc client : carte blanche + ombre, identique a .table-wrap ailleurs */
+.client-block { background: white; border-radius: 10px; margin-bottom: 16px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); }
+.client-name {
+  font-weight: 700; color: #1a2a4a; font-size: 1rem;
+  padding: 10px 14px; background: #f5f2e8;
+  border-bottom: 2px solid #e8e3d5; border-radius: 10px 10px 0 0;
+  display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px;
+}
+.commande-infos { font-size: 0.75rem; font-weight: 500; color: #7a8898; }
+
+/* Ligne */
+.row { display: grid; grid-template-columns: 44px minmax(280px, max-content) 260px; column-gap: 24px; align-items: center; padding: 10px 14px; border-bottom: 1px solid #f0ece0; transition: background 0.15s; }
+.row:last-child { border-bottom: none; border-radius: 0 0 10px 10px; }
+.row:hover { background: #faf8f2; }
+.row.done { background: #eef6ec; }
+.row.done:hover { background: #e6f2e3; }
+.row.done .prodline { text-decoration: line-through; color: #7a8a7a; opacity: 0.75; }
+.row.unsure:not(.done) { background: #fffaf0; border-left: 3px solid #d8c400; }
+.row.unsure:not(.done):hover { background: #fff5e0; }
+
+/* Coche */
+.check { width: 26px; height: 26px; accent-color: #2f6f4f; cursor: pointer; }
+
+/* Produit */
+.prodline { display: flex; align-items: baseline; flex-wrap: nowrap; white-space: nowrap; gap: 6px; font-size: 0.9rem; color: #222; margin-right: 8px; }
+.qty { font-weight: 700; color: #1a2a4a; margin-right: 2px; white-space: nowrap; }
+
+.design-text { cursor: text; padding: 1px 3px; border-radius: 3px; color: #1a1a1a; }
+.design-text.unsure { background: #fff3a0; padding: 1px 5px; border-radius: 3px; font-weight: 600; box-shadow: inset 0 0 0 1px #d8c400; }
+.design-text:hover { outline: 1px dashed #d0cbb8; }
+
+.product-input { font-size: 0.9rem; border: 1px solid #2f6f4f; border-radius: 6px; padding: 4px 8px; flex: 1; min-width: 140px; background: white; }
+.product-input.unsure { background: #fff3a0; border-color: #d8c400; }
+.product-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
+
+/* Reference : meme style de tag que les codes mono ailleurs (vert) */
+.ref-tag { font-size: 0.8rem; color: #2f6f4f; font-weight: 700; cursor: text; white-space: nowrap; background: #eef6ec; padding: 1px 6px; border-radius: 4px; }
+.ref-tag:hover { text-decoration: underline dotted; }
+.ref-input { font-size: 0.8rem; border: 1px solid #2f6f4f; background: white; padding: 2px 6px; color: #2f6f4f; width: 90px; border-radius: 4px; }
+.ref-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
+
+.prix-hint { font-size: 0.75rem; color: #2f6f4f; font-weight: 600; white-space: nowrap; }
+.unsure-label { background: #fff3a0; padding: 4px 8px; border-radius: 4px; font-size: 0.82rem; font-weight: 600; color: #7a6000; flex: 1; white-space: pre-wrap; box-shadow: inset 0 0 0 1px #d8c400; }
+
+/* Champs DLC / Lot : meme style d'input que les autres pages (bordure claire, focus vert) */
+.fields { display: flex; gap: 8px; min-width: 0; }
+.field {
+  width: 100%; min-width: 0;
+  border: 1px solid #d0cbb8;
+  border-radius: 6px;
+  padding: 7px 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1a2a4a;
+  background: white;
+  text-align: center;
+}
+.field::placeholder { color: #a89b7a; font-weight: 500; }
+.field:hover { border-color: #2f6f4f; }
+.field:focus { outline: none; border-color: #2f6f4f; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
+.field-dlc { flex: 1.15; }
+.field-lot { flex: 1; }
+
+/* Footer */
+.footer-note { margin: 18px 0 0; font-size: 0.78rem; color: #7a8898; }
+.reset-btn { background: #b3261e; color: white; border: none; padding: 8px 18px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+.reset-btn:hover { background: #8e1a14; }
+
 @media (max-width: 480px) {
-  h1 { font-size: 0.82rem; }
-  .header-right { gap: 8px; }
+  h1 { font-size: 1.2rem; }
+  .toolbar { gap: 8px; }
 }
 </style>
