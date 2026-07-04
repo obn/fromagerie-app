@@ -8,6 +8,32 @@
       <button class="btn primary" @click="ajouterParam">+ Ajouter</button>
     </div>
 
+    <!-- Carte de synchronisation Gmail manuelle -->
+    <div class="gmail-card">
+      <div class="gmail-card-head">
+        <div>
+          <h2>Synchronisation Gmail</h2>
+          <p class="gmail-sub">Récupère les commandes PDF depuis les mails du label configuré</p>
+        </div>
+        <button class="btn primary" :disabled="syncEnCours" @click="lancerSync">
+          {{ syncEnCours ? 'Synchronisation…' : '🔄 Synchroniser maintenant' }}
+        </button>
+      </div>
+
+      <div v-if="syncRapport" class="gmail-rapport" :class="{ erreur: syncRapport.erreur }">
+        <template v-if="syncRapport.erreur">
+          ❌ Erreur : {{ syncRapport.erreur }}
+        </template>
+        <template v-else>
+          ✓ {{ syncRapport.nbMessages }} mail(s) trouvé(s) —
+          {{ syncRapport.nbInseres }} commande(s) insérée(s),
+          {{ syncRapport.nbDoublons }} doublon(s),
+          {{ syncRapport.nbErreurs }} erreur(s)
+          <span class="gmail-date">({{ formatHeure(syncRapport.date) }})</span>
+        </template>
+      </div>
+    </div>
+
     <div v-if="chargement" class="etat">Chargement…</div>
     <div v-else class="table-wrap">
       <table>
@@ -72,6 +98,43 @@ const editId = ref(null);
 const editData = ref({});
 const confirm = ref(null);
 const ajout = ref(null);
+const syncEnCours = ref(false);
+const syncRapport = ref(null);
+
+function formatHeure(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+async function lancerSync() {
+  syncEnCours.value = true;
+  syncRapport.value = null;
+  try {
+    await api.post('/gmail/sync?mode=test', {});
+    // La sync tourne en arriere-plan cote serveur : on interroge le statut
+    // toutes les 1.5s jusqu'a ce qu'elle soit terminee.
+    await new Promise(resolve => {
+      const interval = setInterval(async () => {
+        try {
+          const statut = await api.get('/gmail/statut');
+          if (!statut.en_cours) {
+            clearInterval(interval);
+            syncRapport.value = statut.dernier_rapport;
+            resolve();
+          }
+        } catch (e) {
+          clearInterval(interval);
+          syncRapport.value = { erreur: e.message };
+          resolve();
+        }
+      }, 1500);
+    });
+  } catch (e) {
+    syncRapport.value = { erreur: e.message };
+  } finally {
+    syncEnCours.value = false;
+  }
+}
 
 async function charger() {
   chargement.value = true;
@@ -116,6 +179,15 @@ onMounted(charger);
 h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .subtitle { margin: 2px 0 0; color: #7a8898; font-size: 0.85rem; }
 .etat { padding: 40px; text-align: center; color: #7a8898; }
+
+.gmail-card { background: white; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); padding: 18px 20px; margin-bottom: 20px; }
+.gmail-card-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.gmail-card h2 { margin: 0; font-size: 1rem; color: #1a2a4a; }
+.gmail-sub { margin: 3px 0 0; font-size: 0.82rem; color: #7a8898; }
+.gmail-rapport { margin-top: 14px; padding: 10px 12px; border-radius: 6px; background: #eef6ec; color: #2f6f4f; font-size: 0.85rem; }
+.gmail-rapport.erreur { background: #fde8e8; color: #b3261e; }
+.gmail-date { color: #7a8898; font-size: 0.78rem; margin-left: 6px; }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .table-wrap { background: white; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); overflow: hidden; }
 table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
 thead { background: #f5f2e8; }
