@@ -27,19 +27,9 @@
 
     <!-- CONTENU -->
     <div v-else class="wrap">
-      <!-- Conteneur a defilement horizontal : aucun retour a la ligne, on glisse au doigt si l'ecran est etroit -->
-      <div class="scroll-x">
-        <div class="scroll-x-inner">
 
-        <!-- En-tete colonnes -->
-        <div class="head-row">
-          <span></span>
-          <span class="col-label">Produit</span>
-          <span class="col-label">DLC / N° lot</span>
-        </div>
-
-        <!-- BLOC PAR CLIENT -->
-        <div v-for="commande in commandes" :key="commande.id" class="client-block">
+      <!-- BLOC PAR CLIENT : vrai <table> HTML, meme pattern que Commandes/Referentiels -->
+      <div v-for="commande in commandes" :key="commande.id" class="table-wrap client-block">
         <div class="client-name">
           <span>{{ commande.client_nom }}</span>
           <span class="commande-infos">
@@ -49,90 +39,97 @@
           </span>
         </div>
 
-        <!-- LIGNES : conteneur "table" pour un alignement de colonnes stable, -->
-        <!-- indépendant de la longueur du texte de chaque ligne individuelle -->
-        <div class="rows-table">
-        <div
-          v-for="ligne in commande.lignes"
-          :key="ligne.id"
-          :class="['row', { done: etats[ligne.id]?.fait, unsure: ligne.certitude !== 'haute' }]"
-        >
-          <!-- Coche : enveloppee dans un div, Safari applique mal display:table-cell direct sur un input -->
-          <div class="check-cell">
-            <input
-              type="checkbox"
-              class="check"
-              :checked="etats[ligne.id]?.fait"
-              @change="cocher(ligne, $event.target.checked)"
-            />
-          </div>
+        <table>
+          <thead>
+            <tr>
+              <th class="th-check"></th>
+              <th>Produit</th>
+              <th class="th-fields">DLC / N° lot</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="ligne in commande.lignes"
+              :key="ligne.id"
+              :class="['row', { done: etats[ligne.id]?.fait, unsure: ligne.certitude !== 'haute' }]"
+            >
+              <!-- Coche -->
+              <td class="td-check">
+                <input
+                  type="checkbox"
+                  class="check"
+                  :checked="etats[ligne.id]?.fait"
+                  @change="cocher(ligne, $event.target.checked)"
+                />
+              </td>
 
-          <!-- Produit -->
-          <div class="prodline">
-            <span class="qty">{{ ligne.quantite }}<template v-if="ligne.unite"> {{ ligne.unite }}</template></span>
+              <!-- Produit -->
+              <td class="td-produit">
+                <div class="prodline">
+                  <span class="qty">{{ ligne.quantite }}<template v-if="ligne.unite"> {{ ligne.unite }}</template></span>
 
-            <span v-if="ligne.certitude === 'non_fiable'" class="unsure-label">
-              ⚠ ligne brute (chevauchement PDF, à relire) : "{{ ligne.ligne_brute }}"
-            </span>
+                  <span v-if="ligne.certitude === 'non_fiable'" class="unsure-label">
+                    ⚠ ligne brute (chevauchement PDF, à relire) : "{{ ligne.ligne_brute }}"
+                  </span>
 
-            <template v-else>
-              <!-- Designation : surlignee en jaune si incertaine ; clic pour editer -->
-              <span
-                v-if="editId !== ligne.id"
-                :class="['design-text', { unsure: ligne.certitude !== 'haute' }]"
-                @click="editId = ligne.id"
-              >{{ etats[ligne.id]?.produit ?? ligne.designation_brute }}</span>
-              <input
-                v-else
-                class="product-input"
-                :class="{ unsure: ligne.certitude !== 'haute' }"
-                :value="etats[ligne.id]?.produit ?? ligne.designation_brute"
-                @input="majEtat(ligne.id, 'produit', $event.target.value)"
-                @blur="editId = null"
-              />
+                  <template v-else>
+                    <span
+                      v-if="editId !== ligne.id"
+                      :class="['design-text', { unsure: ligne.certitude !== 'haute' }]"
+                      @click="editId = ligne.id"
+                    >{{ etats[ligne.id]?.produit ?? ligne.designation_brute }}</span>
+                    <input
+                      v-else
+                      class="product-input"
+                      :class="{ unsure: ligne.certitude !== 'haute' }"
+                      :value="etats[ligne.id]?.produit ?? ligne.designation_brute"
+                      @input="majEtat(ligne.id, 'produit', $event.target.value)"
+                      @blur="editId = null"
+                    />
 
-              <!-- Reference : tag bracket vert style maquette, clic pour editer -->
-              <span
-                v-if="(ligne.code_interne || ligne.gencod) && editRefId !== ligne.id"
-                class="ref-tag"
-                @click="editRefId = ligne.id"
-              >[{{ etats[ligne.id]?.ref ?? (ligne.code_interne || ligne.gencod) }}]</span>
-              <input
-                v-else-if="ligne.code_interne || ligne.gencod"
-                class="ref-input"
-                :value="etats[ligne.id]?.ref ?? (ligne.code_interne || ligne.gencod)"
-                @input="majEtat(ligne.id, 'ref', $event.target.value)"
-                @blur="editRefId = null"
-              />
+                    <span
+                      v-if="(ligne.code_interne || ligne.gencod) && editRefId !== ligne.id"
+                      class="ref-tag"
+                      @click="editRefId = ligne.id"
+                    >[{{ etats[ligne.id]?.ref ?? (ligne.code_interne || ligne.gencod) }}]</span>
+                    <input
+                      v-else-if="ligne.code_interne || ligne.gencod"
+                      class="ref-input"
+                      :value="etats[ligne.id]?.ref ?? (ligne.code_interne || ligne.gencod)"
+                      @input="majEtat(ligne.id, 'ref', $event.target.value)"
+                      @blur="editRefId = null"
+                    />
 
-              <span v-if="ligne.tarif_net" class="prix-hint">
-                {{ Number(ligne.tarif_net).toFixed(2) }} € / {{ ligne.unite_tarif }}
-              </span>
-            </template>
-          </div>
+                    <span v-if="ligne.tarif_net" class="prix-hint">
+                      {{ Number(ligne.tarif_net).toFixed(2) }} € / {{ ligne.unite_tarif }}
+                    </span>
+                  </template>
+                </div>
+              </td>
 
-          <!-- DLC + Lot regroupes : passent sous le produit sur petit ecran (evite le chevauchement) -->
-          <div class="fields">
-            <input
-              type="date"
-              class="field field-dlc"
-              :value="etats[ligne.id]?.dlc"
-              @input="majEtat(ligne.id, 'dlc', $event.target.value)"
-            />
-            <input
-              type="text"
-              class="field field-lot"
-              placeholder="Lot"
-              :value="etats[ligne.id]?.lot"
-              @input="majEtat(ligne.id, 'lot', $event.target.value)"
-            />
-          </div>
-        </div>
-
-        </div>
-        </div>
-
-        </div>
+              <!-- DLC + Lot -->
+              <td class="td-fields">
+                <div class="fields">
+                  <input
+                    type="date"
+                    class="field field-dlc"
+                    autocomplete="off"
+                    :value="etats[ligne.id]?.dlc"
+                    @input="majEtat(ligne.id, 'dlc', $event.target.value)"
+                  />
+                  <input
+                    type="text"
+                    class="field field-lot"
+                    placeholder="Lot"
+                    autocomplete="off"
+                    :value="etats[ligne.id]?.lot"
+                    @input="majEtat(ligne.id, 'lot', $event.target.value)"
+                  />
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <!-- FOOTER -->
@@ -163,7 +160,11 @@ const dateAffichee = computed(() =>
 
 function fmtDate(d) {
   if (!d) return '—';
-  return new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  // L'API peut renvoyer soit 'YYYY-MM-DD' soit un ISO complet avec heure
+  // (ex: '2026-07-04T00:00:00.000Z') selon le driver MySQL — on ne garde
+  // que la partie date pour eviter un "Invalid Date" en concatenant deux fois l'heure.
+  const datePart = String(d).slice(0, 10);
+  return new Date(datePart + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 // ── Données ───────────────────────────────────────────────────────────────────
@@ -280,7 +281,6 @@ onMounted(charger);
 </script>
 
 <style scoped>
-/* Palette identique aux autres pages (Commandes, Referentiels, Parametres) */
 .page { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
@@ -290,7 +290,7 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .sel { padding: 7px 10px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.85rem; background: white; }
 .count-badge { background: #eef6ec; color: #2f6f4f; font-weight: 700; font-size: 0.82rem; padding: 5px 12px; border-radius: 20px; white-space: nowrap; }
 
-.statut-line { max-width: 1100px; margin: -8px 0 12px; font-size: 0.78rem; color: #2f6f4f; text-align: right; }
+.statut-line { margin: -8px 0 12px; font-size: 0.78rem; color: #2f6f4f; text-align: right; }
 .statut-line.erreur { color: #b3261e; }
 
 .legend { margin: 0 0 14px; font-size: 0.8rem; color: #7a8898; display: flex; gap: 16px; flex-wrap: wrap; }
@@ -299,17 +299,9 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .etat { padding: 40px; text-align: center; color: #7a8898; }
 .hint { font-size: 0.85rem; display: block; margin-top: 8px; }
 
-/* Defilement horizontal : aucun retour a la ligne, on glisse au doigt si l'ecran
-   est trop etroit pour tout afficher sur une seule ligne (utile en portrait iPad). */
-.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.scroll-x-inner { min-width: 640px; }
-
-/* En-tete colonnes : meme style que les th des tables des autres pages */
-.head-row { display: grid; grid-template-columns: 44px minmax(280px, max-content) 260px; column-gap: 24px; padding: 0 14px 6px; }
-.col-label { font-size: 0.71rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #5a6070; }
-
-/* Bloc client : carte blanche + ombre, identique a .table-wrap ailleurs */
-.client-block { background: white; border-radius: 10px; margin-bottom: 16px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); }
+/* Meme pattern exact que Commandes.vue / Referentiels.vue : une vraie table HTML
+   dans un conteneur overflow-x:auto — aucun bug de scroll constate sur ce pattern. */
+.client-block { background: white; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); margin-bottom: 16px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .client-name {
   font-weight: 700; color: #1a2a4a; font-size: 1rem;
   padding: 10px 14px; background: #f5f2e8;
@@ -318,36 +310,26 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 }
 .commande-infos { font-size: 0.75rem; font-weight: 500; color: #7a8898; }
 
-/* Lignes : display:table plutot que grid par ligne. Avantage cle : la largeur
-   des colonnes est calculee UNE FOIS pour tout le bloc client (sur la base du
-   contenu le plus large), donc les colonnes DLC/Lot restent parfaitement
-   alignees entre toutes les lignes, quelle que soit la longueur du libelle
-   produit de chacune — contrairement a un grid independant par ligne. */
-.rows-table { display: table; width: 100%; table-layout: auto; border-collapse: collapse; }
-.row { display: table-row; }
-.row > * { display: table-cell; vertical-align: middle; padding: 10px 14px; border-bottom: 1px solid #f0ece0; }
-.row:last-child > * { border-bottom: none; }
-.row:hover > * { background: #faf8f2; }
-.row.done > * { background: #eef6ec; }
-.row.done:hover > * { background: #e6f2e3; }
-.row.done .prodline { text-decoration: line-through; color: #7a8a7a; opacity: 0.75; }
-.row.unsure:not(.done) > *:first-child { border-left: 3px solid #d8c400; }
-.row.unsure:not(.done) > * { background: #fffaf0; }
-.row.unsure:not(.done):hover > * { background: #fff5e0; }
-.rows-table .row:last-child > *:first-child { border-radius: 0 0 0 10px; }
-.rows-table .row:last-child > *:last-child { border-radius: 0 0 10px 0; }
+table { width: 100%; min-width: 480px; border-collapse: collapse; font-size: 0.9rem; }
+thead { background: #f5f2e8; }
+th { text-align: left; font-size: 0.71rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #5a6070; padding: 9px 14px; border-bottom: 2px solid #e8e3d5; white-space: nowrap; }
+.th-check { width: 44px; }
+.th-fields { width: 200px; }
 
-/* Coche */
-.check-cell { width: 26px; text-align: center; }
-.check { width: 26px; height: 26px; accent-color: #2f6f4f; cursor: pointer; }
+td { padding: 10px 14px; border-bottom: 1px solid #f0ece0; vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #faf8f2; }
+tr.done td { background: #eef6ec; }
+tr.done:hover td { background: #e6f2e3; }
+tr.done .prodline { text-decoration: line-through; color: #7a8a7a; opacity: 0.75; }
+tr.unsure:not(.done) td { background: #fffaf0; }
+tr.unsure:not(.done) .td-check { border-left: 3px solid #d8c400; }
+tr.unsure:not(.done):hover td { background: #fff5e0; }
 
-/* Produit */
-/* display:table-cell requis pour la colonne du tableau ; l'agencement horizontal
-   interne (qty + designation + ref + prix) se fait via white-space:nowrap et
-   des elements inline/inline-block avec marges, pas via flex (conflit avec
-   table-cell sur le meme element). */
-.prodline { display: table-cell; vertical-align: middle; white-space: nowrap; font-size: 0.9rem; color: #222; }
-.qty { font-weight: 700; color: #1a2a4a; margin-right: 2px; white-space: nowrap; }
+.check { width: 22px; height: 22px; accent-color: #2f6f4f; cursor: pointer; }
+
+.prodline { white-space: nowrap; }
+.qty { font-weight: 700; color: #1a2a4a; margin-right: 6px; white-space: nowrap; }
 
 .design-text { cursor: text; padding: 1px 3px; border-radius: 3px; color: #1a1a1a; margin-right: 6px; }
 .design-text.unsure { background: #fff3a0; padding: 1px 5px; border-radius: 3px; font-weight: 600; box-shadow: inset 0 0 0 1px #d8c400; }
@@ -357,7 +339,6 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .product-input.unsure { background: #fff3a0; border-color: #d8c400; }
 .product-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
 
-/* Reference : meme style de tag que les codes mono ailleurs (vert) */
 .ref-tag { font-size: 0.8rem; color: #2f6f4f; font-weight: 700; cursor: text; white-space: nowrap; background: #eef6ec; padding: 1px 6px; border-radius: 4px; margin-right: 6px; }
 .ref-tag:hover { text-decoration: underline dotted; }
 .ref-input { font-size: 0.8rem; border: 1px solid #2f6f4f; background: white; padding: 2px 6px; color: #2f6f4f; width: 90px; border-radius: 4px; margin-right: 6px; vertical-align: middle; }
@@ -366,30 +347,17 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .prix-hint { font-size: 0.75rem; color: #2f6f4f; font-weight: 600; white-space: nowrap; }
 .unsure-label { background: #fff3a0; padding: 4px 8px; border-radius: 4px; font-size: 0.82rem; font-weight: 600; color: #7a6000; white-space: pre-wrap; box-shadow: inset 0 0 0 1px #d8c400; }
 
-/* Champs DLC / Lot : meme style d'input que les autres pages (bordure claire, focus vert) */
-/* display:table-cell est requis pour que cette colonne participe au tableau
-   de la ligne (alignement stable) — l'agencement cote-a-cote des 2 champs
-   se fait via les inputs en inline-block ci-dessous, pas via flex (qui
-   entrerait en conflit avec table-cell sur le meme element). */
-.fields { display: table-cell; vertical-align: middle; width: 260px; white-space: nowrap; }
+.fields { display: flex; gap: 6px; }
 .field {
-  width: 100%; min-width: 0;
-  border: 1px solid #d0cbb8;
-  border-radius: 6px;
-  padding: 7px 8px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #1a2a4a;
-  background: white;
-  text-align: center;
+  border: 1px solid #d0cbb8; border-radius: 6px; padding: 7px 8px;
+  font-size: 0.85rem; font-weight: 600; color: #1a2a4a; background: white; text-align: center;
 }
 .field::placeholder { color: #a89b7a; font-weight: 500; }
 .field:hover { border-color: #2f6f4f; }
 .field:focus { outline: none; border-color: #2f6f4f; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
-.field-dlc { display: inline-block; width: 155px; margin-right: 8px; vertical-align: middle; }
-.field-lot { display: inline-block; width: 90px; vertical-align: middle; }
+.field-dlc { width: 130px; }
+.field-lot { width: 60px; }
 
-/* Footer */
 .footer-note { margin: 18px 0 0; font-size: 0.78rem; color: #7a8898; }
 .reset-btn { background: #b3261e; color: white; border: none; padding: 8px 18px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
 .reset-btn:hover { background: #8e1a14; }
