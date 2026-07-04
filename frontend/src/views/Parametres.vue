@@ -188,11 +188,12 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .gmail-rapport.erreur { background: #fde8e8; color: #b3261e; }
 .gmail-date { color: #7a8898; font-size: 0.78rem; margin-left: 6px; }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.table-wrap { background: white; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); overflow: hidden; }
-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.table-wrap { background: white; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
+table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 0.875rem; }
 thead { background: #f5f2e8; }
 th { padding: 10px 14px; text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #5a6070; font-weight: 600; border-bottom: 2px solid #e8e3d5; }
 td { padding: 10px 14px; border-bottom: 1px solid #f0ece0; vertical-align: middle; }
+td:nth-child(2), td:nth-child(3) { min-width: 220px; }
 tr:last-child td { border-bottom: none; }
 tr:hover { background: #faf8f2; }
 .mono { font-family: monospace; font-size: 0.88rem; color: #2f6f4f; font-weight: 600; }
