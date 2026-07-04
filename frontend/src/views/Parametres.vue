@@ -163,7 +163,7 @@ const moisDisponibles = [
   { v: 10, l: 'Octobre' }, { v: 11, l: 'Novembre' }, { v: 12, l: 'Décembre' },
 ];
 
-const deplacement = reactive({ objet: 'COMMANDE', annee: '', mois: '', jour: '', dryRun: true });
+const deplacement = reactive({ objet: 'COMMANDE FROMAGERIE', annee: '', mois: '', jour: '', dryRun: true });
 const deplacementEnCours = ref(false);
 const deplacementRapport = ref(null);
 

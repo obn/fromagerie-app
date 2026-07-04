@@ -71,7 +71,7 @@ router.post('/deplacer-historique', async (req, res) => {
       annee: annee ? parseInt(annee, 10) : null,
       mois: mois ? parseInt(mois, 10) : null,
       jour: jour ? parseInt(jour, 10) : null,
-      objet: objet || 'COMMANDE',
+      objet: objet || 'COMMANDE FROMAGERIE',
     });
 
     if (!requete.trim()) {

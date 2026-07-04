@@ -56,7 +56,13 @@ async function listerTousLesMessages(accessToken, requete) {
  */
 function construireRequete({ annee, mois, jour, objet }) {
   const parties = [];
-  if (objet) parties.push(`subject:${objet}`);
+  // Plusieurs mots separes par un espace sont combines en ET logique
+  // (chaque mot doit apparaitre dans l'objet du mail) — comportement
+  // natif de Gmail avec plusieurs operateurs subject: juxtaposes.
+  if (objet && objet.trim()) {
+    const mots = objet.trim().split(/\s+/);
+    for (const mot of mots) parties.push(`subject:${mot}`);
+  }
 
   if (annee && mois && jour) {
     const debut = new Date(Date.UTC(annee, mois - 1, jour));
