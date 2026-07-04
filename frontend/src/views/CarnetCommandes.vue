@@ -57,13 +57,15 @@
           :key="ligne.id"
           :class="['row', { done: etats[ligne.id]?.fait, unsure: ligne.certitude !== 'haute' }]"
         >
-          <!-- Coche -->
-          <input
-            type="checkbox"
-            class="check"
-            :checked="etats[ligne.id]?.fait"
-            @change="cocher(ligne, $event.target.checked)"
-          />
+          <!-- Coche : enveloppee dans un div, Safari applique mal display:table-cell direct sur un input -->
+          <div class="check-cell">
+            <input
+              type="checkbox"
+              class="check"
+              :checked="etats[ligne.id]?.fait"
+              @change="cocher(ligne, $event.target.checked)"
+            />
+          </div>
 
           <!-- Produit -->
           <div class="prodline">
@@ -336,32 +338,40 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .rows-table .row:last-child > *:last-child { border-radius: 0 0 10px 0; }
 
 /* Coche */
+.check-cell { width: 26px; text-align: center; }
 .check { width: 26px; height: 26px; accent-color: #2f6f4f; cursor: pointer; }
-.row > .check { width: 26px; } /* largeur de colonne stable, identique sur toutes les lignes */
 
 /* Produit */
-.prodline { display: flex; align-items: baseline; flex-wrap: nowrap; white-space: nowrap; gap: 6px; font-size: 0.9rem; color: #222; margin-right: 8px; }
+/* display:table-cell requis pour la colonne du tableau ; l'agencement horizontal
+   interne (qty + designation + ref + prix) se fait via white-space:nowrap et
+   des elements inline/inline-block avec marges, pas via flex (conflit avec
+   table-cell sur le meme element). */
+.prodline { display: table-cell; vertical-align: middle; white-space: nowrap; font-size: 0.9rem; color: #222; }
 .qty { font-weight: 700; color: #1a2a4a; margin-right: 2px; white-space: nowrap; }
 
-.design-text { cursor: text; padding: 1px 3px; border-radius: 3px; color: #1a1a1a; }
+.design-text { cursor: text; padding: 1px 3px; border-radius: 3px; color: #1a1a1a; margin-right: 6px; }
 .design-text.unsure { background: #fff3a0; padding: 1px 5px; border-radius: 3px; font-weight: 600; box-shadow: inset 0 0 0 1px #d8c400; }
 .design-text:hover { outline: 1px dashed #d0cbb8; }
 
-.product-input { font-size: 0.9rem; border: 1px solid #2f6f4f; border-radius: 6px; padding: 4px 8px; flex: 1; min-width: 140px; background: white; }
+.product-input { font-size: 0.9rem; border: 1px solid #2f6f4f; border-radius: 6px; padding: 4px 8px; min-width: 140px; background: white; margin-right: 6px; vertical-align: middle; }
 .product-input.unsure { background: #fff3a0; border-color: #d8c400; }
 .product-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
 
 /* Reference : meme style de tag que les codes mono ailleurs (vert) */
-.ref-tag { font-size: 0.8rem; color: #2f6f4f; font-weight: 700; cursor: text; white-space: nowrap; background: #eef6ec; padding: 1px 6px; border-radius: 4px; }
+.ref-tag { font-size: 0.8rem; color: #2f6f4f; font-weight: 700; cursor: text; white-space: nowrap; background: #eef6ec; padding: 1px 6px; border-radius: 4px; margin-right: 6px; }
 .ref-tag:hover { text-decoration: underline dotted; }
-.ref-input { font-size: 0.8rem; border: 1px solid #2f6f4f; background: white; padding: 2px 6px; color: #2f6f4f; width: 90px; border-radius: 4px; }
+.ref-input { font-size: 0.8rem; border: 1px solid #2f6f4f; background: white; padding: 2px 6px; color: #2f6f4f; width: 90px; border-radius: 4px; margin-right: 6px; vertical-align: middle; }
 .ref-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
 
 .prix-hint { font-size: 0.75rem; color: #2f6f4f; font-weight: 600; white-space: nowrap; }
-.unsure-label { background: #fff3a0; padding: 4px 8px; border-radius: 4px; font-size: 0.82rem; font-weight: 600; color: #7a6000; flex: 1; white-space: pre-wrap; box-shadow: inset 0 0 0 1px #d8c400; }
+.unsure-label { background: #fff3a0; padding: 4px 8px; border-radius: 4px; font-size: 0.82rem; font-weight: 600; color: #7a6000; white-space: pre-wrap; box-shadow: inset 0 0 0 1px #d8c400; }
 
 /* Champs DLC / Lot : meme style d'input que les autres pages (bordure claire, focus vert) */
-.fields { display: flex; gap: 8px; min-width: 0; width: 260px; }
+/* display:table-cell est requis pour que cette colonne participe au tableau
+   de la ligne (alignement stable) — l'agencement cote-a-cote des 2 champs
+   se fait via les inputs en inline-block ci-dessous, pas via flex (qui
+   entrerait en conflit avec table-cell sur le meme element). */
+.fields { display: table-cell; vertical-align: middle; width: 260px; white-space: nowrap; }
 .field {
   width: 100%; min-width: 0;
   border: 1px solid #d0cbb8;
@@ -376,8 +386,8 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .field::placeholder { color: #a89b7a; font-weight: 500; }
 .field:hover { border-color: #2f6f4f; }
 .field:focus { outline: none; border-color: #2f6f4f; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
-.field-dlc { flex: 1.15; }
-.field-lot { flex: 1; }
+.field-dlc { display: inline-block; width: 155px; margin-right: 8px; vertical-align: middle; }
+.field-lot { display: inline-block; width: 90px; vertical-align: middle; }
 
 /* Footer */
 .footer-note { margin: 18px 0 0; font-size: 0.78rem; color: #7a8898; }
