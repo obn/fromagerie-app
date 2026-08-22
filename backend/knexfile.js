@@ -3,7 +3,10 @@ require('dotenv').config();
 // Railway expose en general une variable unique MYSQL_URL (ou DATABASE_URL).
 // On supporte les deux : soit une URL complete, soit des variables separees.
 const connection = process.env.MYSQL_URL
-  ? process.env.MYSQL_URL
+  ? {
+      connectionString: process.env.MYSQL_URL,
+      ssl: { rejectUnauthorized: false },
+    }
   : {
       host: process.env.MYSQLHOST || '127.0.0.1',
       port: process.env.MYSQLPORT || 3306,
