@@ -1,5 +1,10 @@
 require('dotenv').config();
 
+// DIAGNOSTIC TEMPORAIRE — a retirer une fois le probleme resolu
+console.log('[DIAGNOSTIC] MYSQL_URL présente ?', !!process.env.MYSQL_URL);
+console.log('[DIAGNOSTIC] MYSQL_URL longueur :', (process.env.MYSQL_URL || '').length);
+console.log('[DIAGNOSTIC] Toutes les vars MYSQL* :', Object.keys(process.env).filter(k => k.includes('MYSQL')));
+
 // Railway expose en general une variable unique MYSQL_URL (ou DATABASE_URL).
 // On supporte les deux : soit une URL complete, soit des variables separees.
 const connection = process.env.MYSQL_URL
