@@ -13,7 +13,7 @@ function construireConnection() {
       password: decodeURIComponent(url.password),
       database: url.pathname.replace(/^\//, ''),
       charset: 'utf8mb4',
-      ssl: { rejectUnauthorized: false },
+      ssl: { rejectUnauthorized: false, minVersion: 'TLSv1.2' },
     };
   }
   return {
