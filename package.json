@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "build": "npm --prefix frontend install && npm --prefix frontend run build && npm --prefix backend install",
-    "start": "node backend/src/server.js"
+    "start": "cd backend && npm run migrate && npm run seed && npm start"
   },
   "engines": {
     "node": ">=20.0.0"
