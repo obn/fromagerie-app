@@ -5,7 +5,6 @@
         <h1>Paramètres</h1>
         <p class="subtitle">Configuration de l'application</p>
       </div>
-      <button class="btn primary" @click="ajouterParam">+ Ajouter</button>
     </div>
 
     <!-- Carte de synchronisation Gmail manuelle -->
@@ -114,8 +113,12 @@
     </div>
 
     <div v-if="chargement" class="etat">Chargement…</div>
-    <div v-else class="table-wrap">
-      <table>
+    <div v-else>
+      <div class="table-wrap">
+        <div class="table-actions">
+          <button class="btn primary" @click="ajouterParam">+ Ajouter</button>
+        </div>
+        <table>
         <thead>
           <tr><th>Clé</th><th>Valeur</th><th>Description</th><th></th></tr>
         </thead>
@@ -346,7 +349,38 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .deplacement-details li { padding: 4px 0; font-size: 0.8rem; }
 .deplacement-details li.deplace { color: #2f6f4f; }
 .deplacement-details li.ignore { color: #9a9488; }
-.table-wrap { background: white; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
+.table-wrap { background: white; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; margin-top: 12px; }
+/* Ensure the actions bar is part of the card and not positioned elsewhere */
+.table-actions { display:flex !important; justify-content:flex-end !important; padding: 12px 18px !important; margin: 0 !important; background: transparent !important; position: relative !important; z-index: 1 !important; border-bottom: 1px solid rgba(0,0,0,0.04); border-top-left-radius: 10px; border-top-right-radius: 10px; }
+.table-actions .btn { align-self: center !important; position: static !important; float: right !important; }
+
+/* Responsive adjustments for the add button */
+@media (max-width: 640px) {
+  .table-actions { padding: 8px 12px !important; }
+  .table-actions .btn { padding: 8px 12px !important; font-size: 0.85rem !important; }
+  /* Ensure button stays visible and doesn't overflow */
+  .table-actions { flex: 0 0 auto !important; }
+}
+
+@media (max-width: 420px) {
+  /* On very small phones reduce button padding and allow wrapping */
+  .table-actions { justify-content: flex-end !important; }
+  .table-actions .btn { padding: 6px 10px !important; font-size: 0.82rem !important; }
+}
+
+/* Responsive adjustments for the add button */
+@media (max-width: 640px) {
+  .table-actions { padding: 8px 12px; }
+  .table-actions .btn { padding: 8px 12px; font-size: 0.85rem; }
+  /* Ensure button stays visible and doesn't overflow */
+  .table-actions { flex: 0 0 auto; }
+}
+
+@media (max-width: 420px) {
+  /* On very small phones reduce button padding and allow wrapping */
+  .table-actions { justify-content: flex-end; }
+  .table-actions .btn { padding: 6px 10px; font-size: 0.82rem; }
+}
 table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 0.875rem; }
 thead { background: #f5f2e8; }
 th { padding: 10px 14px; text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #5a6070; font-weight: 600; border-bottom: 2px solid #e8e3d5; }
