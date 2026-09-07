@@ -20,11 +20,10 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Nom</th><th>Type tarif</th><th>Jour fixe livraison</th><th>Actif</th><th></th></tr></thead>
+          <thead><tr><th>Nom</th><th>Jour fixe livraison</th><th>Actif</th><th></th></tr></thead>
           <tbody>
             <tr v-for="c in filtres.clients" :key="c.id">
               <td><strong>{{ c.nom }}</strong></td>
-              <td><span :class="['badge', badgeTypeTarif(c.type_tarif)]">{{ libelleTypeTarif(c.type_tarif) }}</span></td>
               <td>{{ c.jour_fixe_livraison || '—' }}</td>
               <td><span :class="['badge', c.actif ? 'vert' : 'gris']">{{ c.actif ? 'Actif' : 'Inactif' }}</span></td>
               <td class="act">
@@ -158,13 +157,6 @@
       <!-- Clients -->
       <template v-if="modal.type === 'clients'">
         <label>Nom <input v-model="form.nom" class="inp" /></label>
-        <label>Type tarif
-          <select v-model="form.type_tarif" class="inp">
-            <option value="client">Client (tarif spécifique)</option>
-            <option value="general">Général</option>
-            <option value="grossiste">Grossiste</option>
-          </select>
-        </label>
         <label>Jour fixe livraison <input v-model="form.jour_fixe_livraison" placeholder="ex: jeudi" class="inp" /></label>
         <label class="row-check"><input type="checkbox" v-model="form.actif" /> Actif</label>
       </template>
@@ -268,18 +260,6 @@ const filtres = computed(() => ({
 
 const fmt = v => v ? Number(v).toFixed(2) + ' €' : '—';
 
-function libelleTypeTarif(t) {
-  if (t === 'general') return 'Général';
-  if (t === 'grossiste') return 'Grossiste';
-  return 'Client (tarif spécifique)';
-}
-
-function badgeTypeTarif(t) {
-  if (t === 'general') return 'bleu';
-  if (t === 'grossiste') return 'jaune';
-  return 'vert';
-}
-
 async function chargerClients()  { data.clients  = await api.get('/referentiels/clients'); }
 async function chargerProduits() { data.produits = await api.get('/referentiels/produits'); }
 async function chargerTarifs()   {
@@ -313,7 +293,7 @@ function ouvrir(type, item = null) {
 }
 
 function defaultForm(type) {
-  if (type === 'clients')  return { nom: '', type_tarif: 'client', jour_fixe_livraison: '', actif: true };
+  if (type === 'clients')  return { nom: '', jour_fixe_livraison: '', actif: true };
   if (type === 'produits') return { gencod: '', designation: '', unite: '', dluo_jours: null, actif: true };
   if (type === 'tarifs')   return { client_id: '', produit_id: '', pcb: null, tarif_general: null, remise_pct: null, tarif_net: null, unite_facturation: '' };
   if (type === 'codes')    return { client_id: '', code_interne: '', produit_id: '' };
@@ -394,7 +374,6 @@ tr:hover { background: #faf8f2; }
 .badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
 .badge.vert { background: #eef6ec; color: #2f6f4f; }
 .badge.bleu { background: #eaf3ff; color: #1d5fbf; }
-.badge.jaune { background: #fff5d6; color: #a67a00; }
 .badge.gris { background: #f0ece0; color: #5a4a30; }
 label { display: flex; flex-direction: column; gap: 5px; font-size: 0.85rem; font-weight: 600; color: #3a4a5a; }
 .row-check { flex-direction: row; align-items: center; gap: 8px; font-weight: 500; }
