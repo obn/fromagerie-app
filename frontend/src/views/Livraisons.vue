@@ -8,6 +8,7 @@
 
       <div class="toolbar week-toolbar">
         <button class="btn-nav" @click="semainePrecedente" aria-label="Semaine précédente">◀</button>
+        <input type="date" class="inp" v-model="dateSelectionnee" @change="selectionnerDateIso($event.target.value)" aria-label="Sélectionner une date" />
         <button class="btn btn-current" :disabled="estSemaineCourante" @click="retourVersSemaineCourante" aria-label="Semaine courante">Aujourd'hui</button>
         <span class="week-range">{{ libellePeriode }}</span>
         <button class="btn-nav" @click="semaineSuivante" aria-label="Semaine suivante">▶</button>
@@ -27,13 +28,15 @@
           <li v-for="commande in jour.commandes" :key="commande.id" class="delivery-item">
             <div class="delivery-main">
               <strong>{{ commande.client_nom }}</strong>
-              <span class="delivery-number">{{ commande.numero_commande }}</span>
+              <div class="delivery-number-row">
+                <span class="delivery-number">{{ commande.numero_commande }}</span>
+                <button class="btn-ico btn-ico-eye" type="button" title="Voir les lignes" @click="ouvrirDetailCommande(commande)">👁</button>
+              </div>
             </div>
 
             <div class="delivery-meta">
               <div class="delivery-status-row">
                 <span :class="['badge-statut', statutClasse(commande.statut)]">{{ libelleStatut(commande.statut) }}</span>
-                <button class="btn-ico" type="button" title="Voir les lignes" @click="ouvrirDetailCommande(commande)">👁</button>
               </div>
               <select class="status-select" :value="commande.statut" @change="changerStatut(commande, $event.target.value)">
                 <option value="prevue">Prévue</option>
@@ -102,6 +105,8 @@ const panelOuvert = ref(false);
 const commandeDetail = ref(null);
 const lignesDetail = ref([]);
 const chargementDetail = ref(false);
+// date selector (ISO yyyy-mm-dd) displayed next to nav buttons
+const dateSelectionnee = ref(formatDateISO(semaineSelectionnee.value));
 
 const estSemaineCourante = computed(() => {
   const semaineActuelle = lundiDeLaSemaine(aujourdHui);
@@ -232,6 +237,14 @@ function fermerDetailCommande() {
   chargementDetail.value = false;
 }
 
+function selectionnerDateIso(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return;
+  semaineSelectionnee.value = lundiDeLaSemaine(d);
+  dateSelectionnee.value = iso;
+  chargerSemaine();
+}
+
 async function changerStatut(livraison, statut) {
   const ancienStatut = livraison.statut;
   livraison.statut = statut;
@@ -257,12 +270,14 @@ function semainePrecedente() {
   const nouvelleSemaine = new Date(semaineSelectionnee.value);
   nouvelleSemaine.setDate(nouvelleSemaine.getDate() - 7);
   semaineSelectionnee.value = nouvelleSemaine;
+  dateSelectionnee.value = formatDateISO(semaineSelectionnee.value);
   chargerSemaine();
 }
 
 function retourVersSemaineCourante() {
   if (estSemaineCourante.value) return;
   semaineSelectionnee.value = lundiDeLaSemaine(aujourdHui);
+  dateSelectionnee.value = formatDateISO(semaineSelectionnee.value);
   chargerSemaine();
 }
 
@@ -270,6 +285,7 @@ function semaineSuivante() {
   const nouvelleSemaine = new Date(semaineSelectionnee.value);
   nouvelleSemaine.setDate(nouvelleSemaine.getDate() + 7);
   semaineSelectionnee.value = nouvelleSemaine;
+  dateSelectionnee.value = formatDateISO(semaineSelectionnee.value);
   chargerSemaine();
 }
 
@@ -300,14 +316,18 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .day-header h2 { margin: 0; font-size: 0.95rem; color: #1a2a4a; }
 .day-header span { display: inline-block; margin-top: 4px; color: #657386; font-size: 0.75rem; }
 .delivery-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.delivery-item { display: flex; flex-direction: column; gap: 6px; background: #faf7f1; border: 1px solid #efe9db; border-radius: 8px; padding: 8px 10px; }
+/* slightly more right padding so inline controls stay within card on small screens */
+.delivery-item { display: flex; flex-direction: column; gap: 6px; background: #faf7f1; border: 1px solid #efe9db; border-radius: 8px; padding: 8px 12px; }
 .delivery-main { display: flex; flex-direction: column; gap: 2px; color: #1a2a4a; }
+.delivery-number-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .delivery-number { color: #5a6070; font-size: 0.72rem; font-family: monospace; }
+.btn-ico-eye { font-size: 0.95rem; padding: 4px 6px; border-radius: 6px; }
 .delivery-meta { display: flex; flex-direction: column; gap: 6px; }
-.delivery-status-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* keep badge in normal flow; eye icon moved next to number */
+.delivery-status-row { display: flex; align-items: center; justify-content: flex-start; gap: 8px; }
 .delivery-time { color: #2f6f4f; font-size: 0.72rem; font-weight: 600; }
 .status-select { border: 1px solid #d0cbb8; border-radius: 6px; background: white; color: #1a2a4a; padding: 5px 8px; font-size: 0.72rem; }
-.btn-ico { border: none; background: transparent; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 0.88rem; }
+.btn-ico { border: none; background: transparent; cursor: pointer; padding: 6px 8px; border-radius: 6px; font-size: 0.9rem; }
 .btn-ico:hover { background: #f0ece0; }
 .empty { margin: 12px 0 0; font-size: 0.82rem; color: #7a8898; text-align: center; }
 .badge-statut { display: inline-flex; align-items: center; justify-content: center; width: fit-content; min-width: 88px; padding: 4px 8px; border-radius: 999px; font-size: 0.69rem; font-weight: 700; line-height: 1.4; }
