@@ -31,7 +31,10 @@
             </div>
 
             <div class="delivery-meta">
-              <span :class="['badge-statut', statutClasse(commande.statut)]">{{ libelleStatut(commande.statut) }}</span>
+              <div class="delivery-status-row">
+                <span :class="['badge-statut', statutClasse(commande.statut)]">{{ libelleStatut(commande.statut) }}</span>
+                <button class="btn-ico" type="button" title="Voir les lignes" @click="ouvrirDetailCommande(commande)">👁</button>
+              </div>
               <select class="status-select" :value="commande.statut" @change="changerStatut(commande, $event.target.value)">
                 <option value="prevue">Prévue</option>
                 <option value="en_cours">En cours</option>
@@ -49,6 +52,41 @@
         <p v-else class="empty">Aucune livraison</p>
       </div>
     </div>
+
+    <div v-if="panelOuvert" class="panel-overlay" @click.self="fermerDetailCommande">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>{{ commandeDetail?.client_nom || 'Commande' }} — N° {{ commandeDetail?.numero_commande || '—' }}</h2>
+          <button class="btn-ico" type="button" @click="fermerDetailCommande" aria-label="Fermer">✕</button>
+        </div>
+
+        <div v-if="chargementDetail" class="etat">Chargement…</div>
+
+        <table v-else class="tbl-lignes">
+          <thead>
+            <tr>
+              <th>Qté</th>
+              <th>Désignation</th>
+              <th>Réf.</th>
+              <th>Prix</th>
+              <th>Certitude</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="ligne in lignesDetail" :key="ligne.id" :class="'cert-' + (ligne.certitude || 'a_verifier')">
+              <td class="num">{{ ligne.quantite }}</td>
+              <td>{{ ligne.designation_brute }}</td>
+              <td class="mono">{{ ligne.code_interne || ligne.reference || ligne.gencod || '—' }}</td>
+              <td class="num prix">{{ formatPrix(ligne.tarif_net ?? ligne.prix) }}</td>
+              <td><span :class="['badge-cert', ligne.certitude || 'a_verifier']">{{ ligne.certitude || 'À vérifier' }}</span></td>
+            </tr>
+            <tr v-if="!lignesDetail.length">
+              <td colspan="5" class="empty-line">Aucune ligne pour cette commande.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -60,6 +98,10 @@ const aujourdHui = new Date();
 const semaineSelectionnee = ref(lundiDeLaSemaine(aujourdHui));
 const chargement = ref(true);
 const donnees = ref({ debutSemaine: '', finSemaine: '', commandes: [] });
+const panelOuvert = ref(false);
+const commandeDetail = ref(null);
+const lignesDetail = ref([]);
+const chargementDetail = ref(false);
 
 const estSemaineCourante = computed(() => {
   const semaineActuelle = lundiDeLaSemaine(aujourdHui);
@@ -161,6 +203,35 @@ function formatHeure(valeur) {
   return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date);
 }
 
+function formatPrix(valeur) {
+  if (valeur === null || valeur === undefined || valeur === '') return '—';
+  const nombre = Number(String(valeur).replace(',', '.'));
+  return Number.isFinite(nombre) ? `${nombre.toFixed(2)} €` : '—';
+}
+
+async function ouvrirDetailCommande(commande) {
+  const commandeId = commande.commande_id || commande.id;
+  panelOuvert.value = true;
+  chargementDetail.value = true;
+  commandeDetail.value = commande;
+  lignesDetail.value = [];
+
+  try {
+    const detail = await api.get('/commandes/' + commandeId);
+    commandeDetail.value = detail;
+    lignesDetail.value = detail.lignes || [];
+  } finally {
+    chargementDetail.value = false;
+  }
+}
+
+function fermerDetailCommande() {
+  panelOuvert.value = false;
+  commandeDetail.value = null;
+  lignesDetail.value = [];
+  chargementDetail.value = false;
+}
+
 async function changerStatut(livraison, statut) {
   const ancienStatut = livraison.statut;
   livraison.statut = statut;
@@ -233,8 +304,11 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .delivery-main { display: flex; flex-direction: column; gap: 2px; color: #1a2a4a; }
 .delivery-number { color: #5a6070; font-size: 0.72rem; font-family: monospace; }
 .delivery-meta { display: flex; flex-direction: column; gap: 6px; }
+.delivery-status-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .delivery-time { color: #2f6f4f; font-size: 0.72rem; font-weight: 600; }
 .status-select { border: 1px solid #d0cbb8; border-radius: 6px; background: white; color: #1a2a4a; padding: 5px 8px; font-size: 0.72rem; }
+.btn-ico { border: none; background: transparent; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 0.88rem; }
+.btn-ico:hover { background: #f0ece0; }
 .empty { margin: 12px 0 0; font-size: 0.82rem; color: #7a8898; text-align: center; }
 .badge-statut { display: inline-flex; align-items: center; justify-content: center; width: fit-content; min-width: 88px; padding: 4px 8px; border-radius: 999px; font-size: 0.69rem; font-weight: 700; line-height: 1.4; }
 .badge-statut.vert { background: #eef6ec; color: #2f6f4f; }
@@ -242,6 +316,21 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .badge-statut.gris { background: #f0ece0; color: #5a4a30; }
 .badge-statut.bleu { background: #eaf3ff; color: #1d5fbf; }
 .badge-statut.rouge { background: #fde8e8; color: #b3261e; }
+.panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 100; display: flex; justify-content: flex-end; }
+.panel { width: 640px; max-width: 95vw; background: white; height: 100%; overflow-y: auto; box-shadow: -4px 0 20px rgba(0,0,0,0.15); }
+.panel-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #e8e3d5; position: sticky; top: 0; background: white; z-index: 1; }
+.panel-head h2 { margin: 0; font-size: 1rem; color: #1a2a4a; }
+.tbl-lignes { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.tbl-lignes th { padding: 8px 14px; text-align: left; font-size: 0.71rem; text-transform: uppercase; color: #7a8898; border-bottom: 2px solid #e8e3d5; }
+.tbl-lignes td { padding: 9px 14px; border-bottom: 1px solid #f0ece0; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.prix { font-weight: 700; color: #1a2a4a; }
+.mono { font-family: monospace; font-size: 0.82rem; color: #4a7a5a; }
+.badge-cert { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+.badge-cert.haute { background: #eef6ec; color: #2f6f4f; }
+.badge-cert.a_verifier { background: #fff3a0; color: #7a6000; }
+.badge-cert.non_fiable { background: #fde8e8; color: #b3261e; }
+.empty-line { text-align: center; color: #7a8898; }
 @media (max-width: 1000px) {
   .week-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
 }
