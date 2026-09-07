@@ -29,7 +29,20 @@
               <strong>{{ commande.client_nom }}</strong>
               <span class="delivery-number">{{ commande.numero_commande }}</span>
             </div>
-            <span :class="['badge-statut', statutClasse(commande.statut)]">{{ libelleStatut(commande.statut) }}</span>
+
+            <div class="delivery-meta">
+              <span :class="['badge-statut', statutClasse(commande.statut)]">{{ libelleStatut(commande.statut) }}</span>
+              <select class="status-select" :value="commande.statut" @change="changerStatut(commande, $event.target.value)">
+                <option value="prevue">Prévue</option>
+                <option value="en_cours">En cours</option>
+                <option value="livree">Livrée</option>
+                <option value="annulee">Annulée</option>
+              </select>
+            </div>
+
+            <div v-if="commande.statut === 'livree' && commande.heure_reelle" class="delivery-time">
+              Heure réelle : {{ formatHeure(commande.heure_reelle) }}
+            </div>
           </li>
         </ul>
 
@@ -125,20 +138,38 @@ const jours = computed(() => {
 
 function statutClasse(statut) {
   return {
-    brouillon: 'gris',
-    a_verifier: 'jaune',
-    validee: 'vert',
-    archivee: 'bleu',
+    prevue: 'gris',
+    en_cours: 'bleu',
+    livree: 'vert',
+    annulee: 'rouge',
   }[statut] || 'gris';
 }
 
 function libelleStatut(statut) {
   return {
-    brouillon: 'Brouillon',
-    a_verifier: 'À vérifier',
-    validee: 'Validée',
-    archivee: 'Archivée',
+    prevue: 'Prévue',
+    en_cours: 'En cours',
+    livree: 'Livrée',
+    annulee: 'Annulée',
   }[statut] || statut;
+}
+
+function formatHeure(valeur) {
+  if (!valeur) return '';
+  const date = new Date(`1970-01-01T${valeur}`);
+  if (Number.isNaN(date.getTime())) return valeur;
+  return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date);
+}
+
+async function changerStatut(livraison, statut) {
+  const ancienStatut = livraison.statut;
+  livraison.statut = statut;
+  try {
+    await api.patch('/commandes/livraisons/' + livraison.id, { statut });
+  } catch (e) {
+    livraison.statut = ancienStatut;
+    throw e;
+  }
 }
 
 async function chargerSemaine() {
@@ -201,12 +232,16 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .delivery-item { display: flex; flex-direction: column; gap: 6px; background: #faf7f1; border: 1px solid #efe9db; border-radius: 8px; padding: 8px 10px; }
 .delivery-main { display: flex; flex-direction: column; gap: 2px; color: #1a2a4a; }
 .delivery-number { color: #5a6070; font-size: 0.72rem; font-family: monospace; }
+.delivery-meta { display: flex; flex-direction: column; gap: 6px; }
+.delivery-time { color: #2f6f4f; font-size: 0.72rem; font-weight: 600; }
+.status-select { border: 1px solid #d0cbb8; border-radius: 6px; background: white; color: #1a2a4a; padding: 5px 8px; font-size: 0.72rem; }
 .empty { margin: 12px 0 0; font-size: 0.82rem; color: #7a8898; text-align: center; }
 .badge-statut { display: inline-flex; align-items: center; justify-content: center; width: fit-content; min-width: 88px; padding: 4px 8px; border-radius: 999px; font-size: 0.69rem; font-weight: 700; line-height: 1.4; }
 .badge-statut.vert { background: #eef6ec; color: #2f6f4f; }
 .badge-statut.jaune { background: #fff4d6; color: #8a6400; }
 .badge-statut.gris { background: #f0ece0; color: #5a4a30; }
 .badge-statut.bleu { background: #eaf3ff; color: #1d5fbf; }
+.badge-statut.rouge { background: #fde8e8; color: #b3261e; }
 @media (max-width: 1000px) {
   .week-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
 }

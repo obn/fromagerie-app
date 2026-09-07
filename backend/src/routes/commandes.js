@@ -53,12 +53,24 @@ router.get('/semaine', requireAuth, async (req, res) => {
     const { date } = req.query;
     const semaine = getSemaine(date || formatDateISO(new Date()));
 
-    const commandes = await knex('commandes')
+    const commandes = await knex('livraisons')
+      .join('commandes', 'commandes.id', 'livraisons.commande_id')
       .join('clients', 'clients.id', 'commandes.client_id')
-      .select('commandes.*', 'clients.nom as client_nom')
-      .whereRaw('DATE(commandes.date_livraison) >= ?', [semaine.debutSemaine])
-      .andWhereRaw('DATE(commandes.date_livraison) <= ?', [semaine.finSemaine])
-      .orderBy('commandes.date_livraison', 'asc');
+      .select(
+        'livraisons.id as id',
+        'livraisons.commande_id as commande_id',
+        'commandes.numero_commande as numero_commande',
+        'clients.nom as client_nom',
+        'livraisons.date_livraison as date_livraison',
+        'livraisons.statut as statut',
+        'livraisons.heure_prevue as heure_prevue',
+        'livraisons.heure_reelle as heure_reelle',
+        'livraisons.commentaire as commentaire'
+      )
+      .whereRaw('DATE(livraisons.date_livraison) >= ?', [semaine.debutSemaine])
+      .andWhereRaw('DATE(livraisons.date_livraison) <= ?', [semaine.finSemaine])
+      .orderBy('livraisons.date_livraison', 'asc')
+      .orderBy('commandes.numero_commande', 'asc');
 
     res.json({
       debutSemaine: semaine.debutSemaine,
@@ -67,6 +79,28 @@ router.get('/semaine', requireAuth, async (req, res) => {
     });
   } catch (e) {
     res.status(400).json({ error: e.message });
+  }
+});
+
+// PATCH /api/commandes/livraisons/:id
+router.patch('/livraisons/:id', requireAuth, async (req, res) => {
+  try {
+    const { statut, heure_reelle, commentaire } = req.body || {};
+    const update = {};
+
+    if (statut !== undefined) update.statut = statut;
+    if (heure_reelle !== undefined) update.heure_reelle = heure_reelle || null;
+    if (commentaire !== undefined) update.commentaire = commentaire || null;
+
+    if (!Object.keys(update).length) {
+      return res.status(400).json({ error: 'Aucune donnée de livraison à mettre à jour' });
+    }
+
+    await knex('livraisons').where({ id: req.params.id }).update(update);
+    const livraison = await knex('livraisons').where({ id: req.params.id }).first();
+    res.json(livraison);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
