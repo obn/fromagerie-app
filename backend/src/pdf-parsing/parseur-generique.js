@@ -202,4 +202,5 @@ module.exports = {
   chargerParseursActifs,
   trouverParseurCorrespondant,
   appliquerParseurConfigure,
+  resoudreClientParLibelle,
 };
