@@ -11,6 +11,7 @@ const pdfParse = require('pdf-parse');
 const { creerClientAuthentifie, requeteGmailApi } = require('./auth');
 const { parserPdf } = require('../pdf-parsing/parsers');
 const { insererCommande } = require('../pdf-parsing/inserer-commande');
+const { chargerParseursActifs, trouverParseurCorrespondant, appliquerParseurConfigure } = require('../pdf-parsing/parseur-generique');
 const knex = require('../db/knex');
 
 const LABEL_PAR_DEFAUT = 'commandes validées';
@@ -114,7 +115,17 @@ async function traiterMessage(accessToken, messageId) {
     for (const { filename, buffer } of piecesJointes) {
       try {
         const pdfData = await pdfParse(buffer);
-        const commande = parserPdf(pdfData.text, filename);
+
+        // tenter d'abord le parseur générique configurable
+        const parseursActifs = await chargerParseursActifs();
+        const parseurConfigure = trouverParseurCorrespondant(pdfData.text, filename, parseursActifs);
+
+        let commande;
+        if (parseurConfigure) {
+          commande = appliquerParseurConfigure(pdfData.text, parseurConfigure);
+        } else {
+          commande = parserPdf(pdfData.text, filename);
+        }
 
         if (!commande.client) {
           rapport.pdfs.push({ filename, statut: 'fournisseur_inconnu', commande });
