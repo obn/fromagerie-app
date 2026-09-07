@@ -115,6 +115,7 @@ async function traiterMessage(accessToken, messageId) {
     for (const { filename, buffer } of piecesJointes) {
       try {
         const pdfData = await pdfParse(buffer);
+        console.log('[DEBUG texte PDF]', JSON.stringify(pdfData.text));
 
         // tenter d'abord le parseur générique configurable
         const parseursActifs = await chargerParseursActifs();

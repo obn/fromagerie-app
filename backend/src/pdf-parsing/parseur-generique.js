@@ -6,6 +6,15 @@
  * Complementaire aux parsers JS "historiques" (parsers.js) reserves aux
  * formats trop complexes pour etre exprimes en simples regex (multi-lignes
  * imbriquees comme Distral).
+ *
+ * IMPORTANT — groupes nommes recommandes pour regex_ligne_produit :
+ * pdf-parse peut extraire les colonnes d'un PDF dans un ORDRE DIFFERENT de
+ * l'ordre visuel (ex: designation en fin de "ligne" au lieu du debut, comme
+ * observe avec Disprodal). Pour rester robuste quel que soit cet ordre,
+ * utilise des groupes nommes dans regex_ligne_produit :
+ *   (?<code>...)  (?<designation>...)  (?<quantite>...)  (?<dlc>...)
+ * Le moteur les detecte automatiquement (fallback sur position 1/2/3/4
+ * si aucun groupe nomme n'est utilise, pour compatibilite ascendante).
  */
 
 const knex = require('../db/knex');
@@ -25,18 +34,10 @@ function parseDateAvecFormat(dateStr, formatAnnee) {
   return `${annee}-${mo.padStart(2, '0')}-${j.padStart(2, '0')}`;
 }
 
-/**
- * Recupere tous les parseurs actifs, en cache le temps du process (rafraichi
- * a chaque appel de syncGmail typiquement, pas besoin de cache long).
- */
 async function chargerParseursActifs() {
   return knex('parseurs_fournisseurs').where({ actif: true });
 }
 
-/**
- * Cherche un parseur configure dont les mots-cles de detection matchent
- * le texte du PDF ou le nom du fichier.
- */
 function trouverParseurCorrespondant(texte, nomFichier, parseurs) {
   const t = (texte || '').toLowerCase();
   const f = (nomFichier || '').toLowerCase();
@@ -50,12 +51,6 @@ function trouverParseurCorrespondant(texte, nomFichier, parseurs) {
   return null;
 }
 
-/**
- * Compile une regex stockee en base (chaine texte) en objet RegExp JS.
- * Les flags 'gm' sont ajoutes automatiquement pour les regex de ligne produit
- * (recherche globale multi-lignes), pas pour les regex ponctuelles (numero,
- * dates) qui n'ont besoin que du premier match.
- */
 function compilerRegex(pattern, global = false) {
   try {
     return new RegExp(pattern, global ? 'gm' : '');
@@ -65,10 +60,25 @@ function compilerRegex(pattern, global = false) {
 }
 
 /**
- * Applique un parseur configure (issu de la table parseurs_fournisseurs)
- * a un texte de PDF, et retourne la commande extraite au meme format que
- * les parsers JS historiques (parsers.js).
+ * Extrait (code, designation, quantite, dlc) d'un match, en preferant les
+ * groupes nommes s'ils existent, sinon en repli sur la position 1/2/3/4.
  */
+function extraireChampsMatch(m) {
+  if (m.groups && (m.groups.code || m.groups.designation || m.groups.quantite)) {
+    return {
+      codeInterne: m.groups.code?.trim() || null,
+      designation: m.groups.designation?.trim() || null,
+      quantite: parseQte(m.groups.quantite),
+    };
+  }
+  // Repli position fixe (compatibilite ascendante) : 1=code, 2=designation, 3=quantite
+  return {
+    codeInterne: m[1]?.trim() || null,
+    designation: m[2]?.trim() || null,
+    quantite: parseQte(m[3]),
+  };
+}
+
 function appliquerParseurConfigure(texte, parseur) {
   const lignes = [];
 
@@ -91,12 +101,7 @@ function appliquerParseurConfigure(texte, parseur) {
   const regLigne = compilerRegex(parseur.regex_ligne_produit, true);
   let m;
   while ((m = regLigne.exec(texte)) !== null) {
-    // Convention : groupe 1 = code interne, groupe 2 = designation,
-    // groupe 3 = quantite, groupe 4 = DLC (optionnelle, ignoree pour l'instant
-    // au-dela de marquer la fin de ligne).
-    const codeInterne = m[1]?.trim() || null;
-    const designation = m[2]?.trim() || null;
-    const quantite = parseQte(m[3]);
+    const { codeInterne, designation, quantite } = extraireChampsMatch(m);
 
     if (!designation) continue;
 
