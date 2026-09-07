@@ -123,7 +123,7 @@ async function traiterMessage(accessToken, messageId) {
 
         let commande;
         if (parseurConfigure) {
-          commande = appliquerParseurConfigure(pdfData.text, parseurConfigure);
+          commande = await  appliquerParseurConfigure(pdfData.text, parseurConfigure);
         } else {
           commande = parserPdf(pdfData.text, filename);
         }
