@@ -107,7 +107,17 @@ router.patch('/livraisons/:id', requireAuth, async (req, res) => {
 // POST /api/commandes
 router.post('/', async (req, res) => {
   try {
-    const [id] = await knex('commandes').insert(nettoyer(req.body));
+    const body = nettoyer(req.body);
+    const [id] = await knex('commandes').insert(body);
+
+    if (body.date_livraison) {
+      await knex('livraisons').insert({
+        commande_id: id,
+        date_livraison: body.date_livraison,
+        statut: 'prevue',
+      });
+    }
+
     res.status(201).json(await knex('commandes').where({ id }).first());
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

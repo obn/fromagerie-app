@@ -171,6 +171,14 @@ async function insererCommande(commande, options = {}) {
     fichier_pdf_url:          fichierPdfUrl,
   });
 
+  if (dateLivraisonCalculee) {
+    await knex('livraisons').insert({
+      commande_id: commandeId,
+      date_livraison: dateLivraisonCalculee,
+      statut: 'prevue',
+    });
+  }
+
   // ── Chargement du catalogue interne une seule fois (table restreinte) ─────
   // Utilisé pour deduire le code_interne quand le PDF n'en fournit aucun.
   const catalogueInterne = await knex('ref_produits_internes').select('code_interne', 'libelle_produit');

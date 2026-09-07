@@ -126,6 +126,18 @@ async function traiterMessage(accessToken, messageId) {
           commande = await  appliquerParseurConfigure(pdfData.text, parseurConfigure);
         } else {
           commande = await parserPdf(pdfData.text, filename);
+
+          // Fournisseur non reconnu par aucun parseur configure -> dernier recours via IA
+          /*
+            if (!commande.client) {
+              try {
+                const { parserPdfAvecIA } = require('../pdf-parsing/parser-ia');
+                commande = await parserPdfAvecIA(buffer, filename);
+              } catch (e) {
+                console.error(`[gmail] Echec extraction IA pour "${filename}" : ${e.message}`);
+                // commande reste celle du mode brut (client=null), traitee comme avant
+              }
+            }*/
         }
 
         if (!commande.client) {
