@@ -91,7 +91,7 @@ async function extrairePiecesJointes(accessToken, messageId) {
     }
   }
 
-  return resultat;
+  return { pieces: resultat, internalDate: msg.internalDate || null };
 }
 
 async function marquerCommeLu(accessToken, messageId) {
@@ -105,7 +105,15 @@ async function traiterMessage(accessToken, messageId) {
   const rapport = { messageId, pdfs: [], erreurs: [] };
 
   try {
-    const piecesJointes = await extrairePiecesJointes(accessToken, messageId);
+    const { pieces: piecesJointes, internalDate } = await extrairePiecesJointes(accessToken, messageId);
+    const dateReceptionCalculee = internalDate
+      ? (() => {
+          const d = new Date(Number(internalDate));
+          if (Number.isNaN(d.getTime())) return null;
+          const offset = d.getTimezoneOffset();
+          return new Date(d.getTime() - offset * 60000).toISOString().slice(0, 10);
+        })()
+      : null;
 
     if (piecesJointes.length === 0) {
       rapport.erreurs.push('Aucune pièce jointe PDF trouvée');
@@ -145,7 +153,7 @@ async function traiterMessage(accessToken, messageId) {
           continue;
         }
 
-        const res = await insererCommande(commande, { gmailMessageId: messageId });
+        const res = await insererCommande(commande, { gmailMessageId: messageId, dateReceptionMail: dateReceptionCalculee });
         rapport.pdfs.push({ filename, statut: res.doublon ? 'doublon' : 'insere', ...res });
       } catch (e) {
         rapport.erreurs.push(`${filename} : ${e.message}`);

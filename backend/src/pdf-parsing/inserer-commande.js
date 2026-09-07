@@ -121,7 +121,7 @@ function trouverCodeParLibelle(designation, catalogue) {
 }
 
 async function insererCommande(commande, options = {}) {
-  const { gmailMessageId = null, fichierPdfUrl = null } = options;
+  const { gmailMessageId = null, fichierPdfUrl = null, dateReceptionMail = null } = options;
 
   if (!commande.client) {
     throw new Error('Client non identifié dans le PDF — insertion impossible');
@@ -165,6 +165,7 @@ async function insererCommande(commande, options = {}) {
     date_commande:            commande.dateCommande       || null,
     date_livraison:           dateLivraisonCalculee        || null,
     date_livraison_pdf_brute: commande.dateLivraison       || null, // conservée pour trace/audit
+    date_reception_mail:      dateReceptionMail            || null,
     statut:                   'a_verifier',
     source:                   'gmail',
     gmail_message_id:         gmailMessageId,

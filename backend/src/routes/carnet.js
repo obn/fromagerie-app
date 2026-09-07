@@ -19,9 +19,9 @@ router.get('/:annee/:mois/:jour', async (req, res) => {
     const commandes = await knex('commandes')
       .join('clients', 'clients.id', 'commandes.client_id')
       .where(function () {
-        this.where('commandes.date_commande', date)
+        this.where('commandes.date_reception_mail', date)
           .orWhere(function () {
-            this.whereNull('commandes.date_commande')
+            this.whereNull('commandes.date_reception_mail')
               .andWhereRaw('DATE(commandes.created_at) = ?', [date]);
           });
       })
