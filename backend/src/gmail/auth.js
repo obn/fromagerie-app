@@ -25,6 +25,8 @@ require('dotenv').config();
 const { google } = require('googleapis');
 const readline = require('readline');
 const knex = require('../db/knex');
+const http = require('http');
+const { URL } = require('url');
 
 const REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob';
 const SCOPES = [
