@@ -17,7 +17,7 @@
     <div v-if="chargement" class="etat">Chargement…</div>
 
     <div v-else class="week-grid">
-      <div v-for="jour in jours" :key="jour.dateKey" class="day-card">
+      <div v-for="jour in jours" :key="jour.dateKey" :class="['day-card', { 'day-card-today': estJourActuel(jour.dateKey) }]">
         <div class="day-header">
           <h2>{{ jour.nom }}</h2>
           <span>{{ jour.dateLabel }}</span>
@@ -72,6 +72,10 @@ function normaliserDate(date) {
   if (!date) return null;
   const d = new Date(date);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function estJourActuel(dateKey) {
+  return dateKey === formatDateISO(aujourdHui);
 }
 
 function capitaliser(texte) {
@@ -188,7 +192,8 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .btn-current { min-width: 110px; }
 .etat { padding: 40px; text-align: center; color: #7a8898; }
 .week-grid { display: grid; grid-template-columns: repeat(7, minmax(160px, 1fr)); gap: 14px; }
-.day-card { background: white; border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); padding: 12px; min-height: 220px; }
+.day-card { background: white; border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); padding: 12px; min-height: 220px; border: 1px solid transparent; }
+.day-card-today { background: #f1f8f3; border-color: #2f6f4f; box-shadow: 0 0 0 1px rgba(47,111,79,0.12), 0 1px 6px rgba(0,0,0,0.08); }
 .day-header { border-bottom: 1px solid #f0ece0; padding-bottom: 8px; margin-bottom: 10px; }
 .day-header h2 { margin: 0; font-size: 0.95rem; color: #1a2a4a; }
 .day-header span { display: inline-block; margin-top: 4px; color: #657386; font-size: 0.75rem; }
