@@ -8,6 +8,7 @@
 
       <div class="toolbar week-toolbar">
         <button class="btn-nav" @click="semainePrecedente" aria-label="Semaine précédente">◀</button>
+        <button class="btn btn-current" :disabled="estSemaineCourante" @click="retourVersSemaineCourante" aria-label="Semaine courante">Aujourd'hui</button>
         <span class="week-range">{{ libellePeriode }}</span>
         <button class="btn-nav" @click="semaineSuivante" aria-label="Semaine suivante">▶</button>
       </div>
@@ -42,9 +43,15 @@
 import { computed, onMounted, ref } from 'vue';
 import { api } from '../services/api';
 
-const semaineSelectionnee = ref(lundiDeLaSemaine(new Date()));
+const aujourdHui = new Date();
+const semaineSelectionnee = ref(lundiDeLaSemaine(aujourdHui));
 const chargement = ref(true);
 const donnees = ref({ debutSemaine: '', finSemaine: '', commandes: [] });
+
+const estSemaineCourante = computed(() => {
+  const semaineActuelle = lundiDeLaSemaine(aujourdHui);
+  return formatDateISO(semaineSelectionnee.value) === formatDateISO(semaineActuelle);
+});
 
 function formatDateISO(date) {
   const d = new Date(date);
@@ -147,6 +154,12 @@ function semainePrecedente() {
   chargerSemaine();
 }
 
+function retourVersSemaineCourante() {
+  if (estSemaineCourante.value) return;
+  semaineSelectionnee.value = lundiDeLaSemaine(aujourdHui);
+  chargerSemaine();
+}
+
 function semaineSuivante() {
   const nouvelleSemaine = new Date(semaineSelectionnee.value);
   nouvelleSemaine.setDate(nouvelleSemaine.getDate() + 7);
@@ -167,8 +180,12 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .toolbar { display: flex; align-items: center; gap: 12px; }
 .week-toolbar { background: white; border: 1px solid #e4dfcf; border-radius: 10px; padding: 6px 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
 .week-range { min-width: 220px; text-align: center; font-size: 0.9rem; color: #1a2a4a; font-weight: 600; }
+.btn { border: none; background: #1a2a4a; color: white; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+.btn:hover { opacity: 0.94; }
+.btn:disabled, .btn[disabled] { background: #d4d4d4; color: #7a7a7a; cursor: not-allowed; opacity: 1; }
 .btn-nav { border: none; background: #f0efe8; color: #1a2a4a; border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 1rem; }
 .btn-nav:hover { background: #e7e2d3; }
+.btn-current { min-width: 110px; }
 .etat { padding: 40px; text-align: center; color: #7a8898; }
 .week-grid { display: grid; grid-template-columns: repeat(7, minmax(160px, 1fr)); gap: 14px; }
 .day-card { background: white; border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); padding: 12px; min-height: 220px; }
