@@ -159,20 +159,32 @@ async function setup(mode) {
     process.exit(1);
   }
 
-  const auth = new google.auth.OAuth2(clientId, clientSecret, REDIRECT_URI);
+  const PORT = 53682; // port local temporaire pour capter la redirection OAuth
+  const redirectUri = `http://localhost:${PORT}`;
+
+  const auth = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
   const urlAuth = auth.generateAuthUrl({ access_type: 'offline', scope: SCOPES, prompt: 'consent' });
 
   console.log(`\n=== SETUP GMAIL — mode "${mode}" ===\n`);
   console.log('1. Ouvre cette URL dans ton navigateur :');
   console.log('\n' + urlAuth + '\n');
   console.log('2. Connecte-toi avec le bon compte Gmail et autorise l\'application.');
-  console.log('3. Copie le code affiché.\n');
+  console.log('3. Le code sera capté automatiquement — ne ferme pas ce terminal.\n');
 
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  rl.question('4. Colle le code ici : ', async (code) => {
-    rl.close();
+  const server = http.createServer(async (req, res) => {
+    const url = new URL(req.url, redirectUri);
+    const code = url.searchParams.get('code');
+
+    if (!code) {
+      res.end('Erreur : code manquant dans la redirection.');
+      return;
+    }
+
+    res.end('<html><body style="font-family:sans-serif;padding:40px"><h2>✅ Authentification réussie !</h2><p>Tu peux fermer cet onglet et retourner dans ton terminal.</p></body></html>');
+    server.close();
+
     try {
-      const { tokens } = await auth.getToken(code.trim());
+      const { tokens } = await auth.getToken(code);
       console.log('\n✅ Authentification réussie !\n');
       console.log(`Ajoute ces lignes dans ton .env ET dans Railway Variables :\n`);
       console.log(`${prefix}_REFRESH_TOKEN=${tokens.refresh_token}`);
@@ -183,7 +195,10 @@ async function setup(mode) {
     } catch (e) {
       console.error('Erreur lors de l\'échange du code :', e.message);
     }
+    process.exit(0);
   });
+
+  server.listen(PORT);
 }
 
 if (require.main === module) {
