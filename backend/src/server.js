@@ -36,6 +36,18 @@ app.use('/api/gmail',        requireRole('admin'), gmailRoutes);
 const publicDir = path.join(__dirname, 'public');
 const indexHtml = path.join(publicDir, 'index.html');
 app.use(express.static(publicDir));
+
+// Page publique : politique de confidentialité
+app.get('/confidentialite', (req, res) => {
+  // sert un fichier HTML autonome situé dans backend/src/public-pages/
+  const file = path.join(__dirname, 'public-pages', 'confidentialite.html');
+  if (fs.existsSync(file)) {
+    res.sendFile(file);
+  } else {
+    res.status(404).send('<html><body style="font-family:sans-serif;padding:40px"><h2>Politique de confidentialité</h2><p>Page non trouvée.</p></body></html>');
+  }
+});
+
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Route API inconnue' });
   if (fs.existsSync(indexHtml)) {
