@@ -254,14 +254,17 @@ function detecterFournisseur(texte, nomFichier = '') {
   if (t.includes('distral') || f.includes('distral')) return 'distral';
   if (t.includes('scapalyon') || t.includes('bcf') || f.includes('scapalyon')) return 'scapalyon';
   if (t.includes('logifresh') || f.includes('logifresh')) return 'logifresh';
+  if (t.includes('total colis') || f.toLowerCase().includes('bon_de_commande')) return 'chez_andre';
   return null;
 }
 
-function parserPdf(texte, nomFichier = '') {
+async function parserPdf(texte, nomFichier = '') {
   const fournisseur = detecterFournisseur(texte, nomFichier);
-  if (fournisseur === 'distral')   return parserDistral(texte);
-  if (fournisseur === 'scapalyon') return parserScapalyon(texte);
-  if (fournisseur === 'logifresh') return parserLogifresh(texte);
+  if (fournisseur === 'distral')    return parserDistral(texte);
+  if (fournisseur === 'scapalyon')  return parserScapalyon(texte);
+  if (fournisseur === 'logifresh')  return parserLogifresh(texte);
+  if (fournisseur === 'chez_andre') return await parserChezAndre(texte);
+
 
   // Fournisseur inconnu — retourner les lignes brutes avec certitude nulle
   console.warn(`[parser] Fournisseur non identifié pour "${nomFichier}" — mode brut`);

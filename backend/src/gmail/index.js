@@ -125,7 +125,7 @@ async function traiterMessage(accessToken, messageId) {
         if (parseurConfigure) {
           commande = await  appliquerParseurConfigure(pdfData.text, parseurConfigure);
         } else {
-          commande = parserPdf(pdfData.text, filename);
+          commande = await parserPdf(pdfData.text, filename);
         }
 
         if (!commande.client) {
