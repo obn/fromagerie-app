@@ -1,10 +1,39 @@
 const express = require('express');
 const knex = require('../db/knex');
+const { requireAuth } = require('../auth/middleware');
 const router = express.Router();
 
 const CHAMPS_SYSTEME = ["id", "created_at", "updated_at", "client_nom"];
 function nettoyer(body) { const b = { ...body }; CHAMPS_SYSTEME.forEach(c => delete b[c]); return b; }
 
+
+function formatDateISO(date) {
+  const d = new Date(date);
+  const offset = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - offset * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+function getSemaine(dateParam) {
+  const reference = dateParam ? new Date(dateParam + 'T12:00:00') : new Date();
+  if (Number.isNaN(reference.getTime())) {
+    throw new Error('Date invalide');
+  }
+
+  const lundi = new Date(reference);
+  lundi.setHours(0, 0, 0, 0);
+  const jour = lundi.getDay();
+  const decalage = (jour === 0 ? -6 : 1 - jour);
+  lundi.setDate(lundi.getDate() + decalage);
+
+  const dimanche = new Date(lundi);
+  dimanche.setDate(lundi.getDate() + 6);
+
+  return {
+    debutSemaine: formatDateISO(lundi),
+    finSemaine: formatDateISO(dimanche),
+  };
+}
 
 // GET /api/commandes?annee=2026&mois=06
 router.get('/', async (req, res) => {
@@ -16,6 +45,29 @@ router.get('/', async (req, res) => {
     if (mois)  q = q.andWhereRaw('MONTH(date_livraison) = ?', [mois]);
     res.json(await q.orderBy('date_livraison', 'desc'));
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/commandes/semaine?date=YYYY-MM-DD
+router.get('/semaine', requireAuth, async (req, res) => {
+  try {
+    const { date } = req.query;
+    const semaine = getSemaine(date || formatDateISO(new Date()));
+
+    const commandes = await knex('commandes')
+      .join('clients', 'clients.id', 'commandes.client_id')
+      .select('commandes.*', 'clients.nom as client_nom')
+      .whereRaw('DATE(commandes.date_livraison) >= ?', [semaine.debutSemaine])
+      .andWhereRaw('DATE(commandes.date_livraison) <= ?', [semaine.finSemaine])
+      .orderBy('commandes.date_livraison', 'asc');
+
+    res.json({
+      debutSemaine: semaine.debutSemaine,
+      finSemaine: semaine.finSemaine,
+      commandes,
+    });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 // POST /api/commandes

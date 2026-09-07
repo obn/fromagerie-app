@@ -2,6 +2,7 @@
   <nav v-if="!estPageLogin" class="nav">
     <router-link to="/">Carnet du jour</router-link>
     <router-link to="/commandes">Commandes</router-link>
+    <router-link to="/livraisons">Livraisons</router-link>
     <router-link v-if="estAdminRef" to="/referentiels">Référentiels</router-link>
     <router-link v-if="estAdminRef" to="/parametres">Paramètres</router-link>
     <span class="nav-spacer"></span>
