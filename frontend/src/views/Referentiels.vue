@@ -157,7 +157,18 @@
       <!-- Clients -->
       <template v-if="modal.type === 'clients'">
         <label>Nom <input v-model="form.nom" class="inp" /></label>
-        <label>Jour fixe livraison <input v-model="form.jour_fixe_livraison" placeholder="ex: jeudi" class="inp" /></label>
+        <label>Jour fixe livraison
+          <select v-model="form.jour_fixe_livraison" class="inp">
+            <option value="">— Aucun —</option>
+            <option value="lundi">lundi</option>
+            <option value="mardi">mardi</option>
+            <option value="mercredi">mercredi</option>
+            <option value="jeudi">jeudi</option>
+            <option value="vendredi">vendredi</option>
+            <option value="samedi">samedi</option>
+            <option value="dimanche">dimanche</option>
+          </select>
+        </label>
         <label class="row-check"><input type="checkbox" v-model="form.actif" /> Actif</label>
       </template>
       <!-- Produits -->
