@@ -366,6 +366,100 @@ function convertirDate(dateStr) {
   const [, j, mo, a] = m;
   return `${a}-${mo}-${j}`;
 }
+// ── AC2T (plateforme intermediaire multi-magasins) ─────────────────────────
+// Plateforme utilisee par plusieurs enseignes (Leclerc, U Express, Auchan...)
+// pour transmettre leurs commandes — meme principe que "Chez Andre" pour le
+// reseau Boucherie Andre : UN SEUL template PDF partage, le client reel
+// (magasin) est indique DANS le document ("Client:"), pas fixe par config.
+//
+// Pour ce fournisseur, le PCB correspond a la colonne "Colisage" (nombre
+// d'unites par colis), a distinguer du GENCODE qui la suit immediatement
+// SANS separateur fiable. Astuce de decoupage : tous les gencods de notre
+// catalogue font TOUJOURS exactement 13 chiffres (norme EAN13) — on prend
+// donc les 13 derniers chiffres du bloc numerique comme gencode, le reste
+// (1 ou 2 chiffres selon les lignes) comme colisage (PCB).
+//
+// Pattern reel observe (texte pdf-parse) :
+//   BOUCHONS Affinés Epice kg1COLIS43 770 000 994 063
+//   RIGOTTE Sèche x3 100g affinée filmée2COLIS163 770 000 994 049
+// -> designation="BOUCHONS Affinés Epice kg", quantite_commande=1,
+//    bloc numerique apres "COLIS"="43770000994063" (14 chiffres) ->
+//    13 derniers="3770000994063" (gencode), reste="4" (PCB)
+//    Meme logique pour "163770000994049" (15 chiffres) -> gencode 13
+//    derniers, reste="16" (PCB, ici 2 chiffres).
+async function parserAC2T(texte) {
+  const { resoudreClientParLibelle } = require('./parseur-generique');
+
+  const mCmd = texte.match(/Numéro\s+de\s+commande\s*:\s*(\d+)/i);
+  const numeroCommande = mCmd ? mCmd[1] : 'INCONNU';
+
+  const mDateCmd = texte.match(/Date\s+de\s+commande\s*:\s*(\d{2}\/\d{2}\/\d{4})/i);
+  const mDateLiv = texte.match(/Date\s+de\s+livraison\s*:\s*(\d{2}\/\d{2}\/\d{4})/i);
+
+  // Client dynamique : magasin indique apres "Client:" (le texte est parfois
+  // duplique/colle avec "TARIF: GENERAL" juste apres — on s'arrete la)
+  const mClient = texte.match(/Client\s*:\s*\n([^\n]+?)TARIF/i);
+  const texteClientBrut = mClient?.[1]?.trim();
+  const client = texteClientBrut ? await resoudreClientParLibelle(texteClientBrut) : null;
+
+  // Zone tableau : entre l'entete de colonnes ("GENCODE") et le pied de page
+  // ("TOTAL COLIS")
+  const idxDebut = texte.search(/GENCODE/i);
+  const zoneApresEntete = idxDebut >= 0 ? texte.slice(idxDebut + 'GENCODE'.length) : texte;
+  const idxFin = zoneApresEntete.search(/TOTAL COLIS/i);
+  const zoneUtile = idxFin >= 0 ? zoneApresEntete.slice(0, idxFin) : zoneApresEntete;
+
+  // Ancre fiable et unique : "COLIS" precede de 1-2 chiffres (quantite commandee).
+  // La designation = tout le texte entre deux pivots consecutifs (par position,
+  // pas par classe de caracteres — les designations contiennent souvent des
+  // chiffres comme "150g"/"x3", ce qui casserait une regex de type [^\d]).
+  const regPivot = /(\d{1,2})COLIS([\d\s]+?)(?=[A-ZÀ-Ÿ]|$)/g;
+
+  const lignes = [];
+  let m;
+  let finPrecedent = 0;
+  while ((m = regPivot.exec(zoneUtile)) !== null) {
+    const designation = zoneUtile.slice(finPrecedent, m.index)
+      .replace(/[\r\n]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const quantiteCommande = parseInt(m[1], 10);
+    const blocDigits = m[2].replace(/\s+/g, '');
+    const gencode = blocDigits.length >= 13 ? blocDigits.slice(-13) : null;
+    const colisage = blocDigits.length >= 13 ? parseInt(blocDigits.slice(0, -13), 10) || null : null;
+
+    finPrecedent = m.index + m[0].length;
+
+    if (!designation) continue;
+
+    lignes.push({
+      codeInterne: null,
+      gencod: gencode,
+      designationBrute: designation,
+      quantite: quantiteCommande,
+      unite: 'colis',
+      pcb: colisage,
+      certitude: 'a_verifier',
+      ligneBrute: `${designation} | qte:${quantiteCommande} | pcb:${colisage} | gencode:${gencode}`,
+    });
+  }
+
+  return {
+    client,
+    numeroCommande,
+    dateCommande: mDateCmd ? convertirDate(mDateCmd[1]) : null,
+    dateLivraison: mDateLiv ? convertirDate(mDateLiv[1]) : null,
+    lignes,
+  };
+}
+
+function convertirDate(dateStr) {
+  const m = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!m) return null;
+  const [, j, mo, a] = m;
+  return `${a}-${mo}-${j}`;
+}
 
 async function parserChezAndre(texte) {
   const { resoudreClientParLibelle } = require('./parseur-generique');
@@ -456,6 +550,7 @@ function detecterFournisseur(texte, nomFichier = '') {
   if (t.includes('logifresh') || f.includes('logifresh')) return 'logifresh';
   if (t.includes('total colis') || f.toLowerCase().includes('bon_de_commande')) return 'chez_andre';
   if (t.includes('biocoop') || f.includes('biocoop')) return 'biocoop';
+  if (t.includes('agence ac2t') || t.includes('ac2t.net')) return 'ac2t';
   return null;
 }
 
@@ -466,7 +561,7 @@ async function parserPdf(texte, nomFichier = '') {
   if (fournisseur === 'logifresh')  return parserLogifresh(texte);
   if (fournisseur === 'chez_andre') return await parserChezAndre(texte);
   if (fournisseur === 'biocoop')    return await parserBiocoop(texte);
-
+  if (fournisseur === 'ac2t')       return await parserAC2T(texte);
 
   // Fournisseur inconnu — retourner les lignes brutes avec certitude nulle
   console.warn(`[parser] Fournisseur non identifié pour "${nomFichier}" — mode brut`);
@@ -486,4 +581,4 @@ async function parserPdf(texte, nomFichier = '') {
   };
 }
 
-module.exports = { parserPdf, parserDistral, parserScapalyon, parserLogifresh, parserChezAndre, detecterFournisseur, parseDateFr, parserBiocoop };
+module.exports = { parserPdf, parserDistral, parserScapalyon, parserLogifresh, parserChezAndre, detecterFournisseur, parseDateFr, parserBiocoop, parserAC2T };
