@@ -250,7 +250,7 @@ const libellePeriode = computed(() => {
 
 const jours = computed(() => {
   const debut = new Date(semaineSelectionnee.value);
-  return Array.from({ length: 7 }, (_, index) => {
+  return Array.from({ length: 5 }, (_, index) => {
     const date = new Date(debut);
     date.setDate(debut.getDate() + index);
 
@@ -513,7 +513,7 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .btn-nav:hover { background: #e7e2d3; }
 .btn-current { min-width: 110px; }
 .etat { padding: 40px; text-align: center; color: #7a8898; }
-.week-grid { display: grid; grid-template-columns: repeat(7, minmax(160px, 1fr)); gap: 14px; }
+.week-grid { display: grid; grid-template-columns: repeat(5, minmax(160px, 1fr)); gap: 14px; }
 .day-card { background: white; border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); padding: 12px; min-height: 220px; border: 1px solid transparent; }
 .day-card-today { background: #f1f8f3; border-color: #2f6f4f; box-shadow: 0 0 0 1px rgba(47,111,79,0.12), 0 1px 6px rgba(0,0,0,0.08); }
 .day-header { border-bottom: 1px solid #f0ece0; padding-bottom: 8px; margin-bottom: 10px; }
