@@ -45,10 +45,11 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Gencod</th><th>Désignation</th><th>Unité</th><th>DLUO (j)</th><th>Actif</th><th></th></tr></thead>
+          <thead><tr><th>Gencod</th><th>Réf. Zacher</th><th>Désignation</th><th>Unité</th><th>DLUO (j)</th><th>Actif</th><th></th></tr></thead>
           <tbody>
             <tr v-for="p in filtres.produits" :key="p.id">
               <td class="mono">{{ p.gencod }}</td>
+              <td class="mono">{{ p.ref_zacher || '—' }}</td>
               <td>{{ p.designation }}</td>
               <td>{{ p.unite || '—' }}</td>
               <td class="num">{{ p.dluo_jours ?? '—' }}</td>
@@ -259,7 +260,7 @@ const onglets = computed(() => [
 const filtres = computed(() => ({
   clients: data.clients.filter(c => c.nom.toLowerCase().includes(q.clients.toLowerCase())),
   produits: data.produits.filter(p =>
-    p.designation.toLowerCase().includes(q.produits.toLowerCase()) || p.gencod.includes(q.produits)),
+    p.designation.toLowerCase().includes(q.produits.toLowerCase()) || (p.gencod || '').includes(q.produits) || (p.ref_zacher || '').toLowerCase().includes(q.produits.toLowerCase())),
   tarifs: data.tarifs.filter(t =>
     t.designation.toLowerCase().includes(q.tarifs.toLowerCase()) || t.gencod?.includes(q.tarifs)),
   codes: data.codes.filter(c =>
