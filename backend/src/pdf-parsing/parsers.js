@@ -652,7 +652,6 @@ module.exports = { parserPerrier };
 // (LE PLANTAY) — utilisee pour le rapprochement dynamique avec la table
 // clients (meme mecanisme que Chez Andre / AC2T / Biocoop).
 async function parserProvidis(texte) {
-  const { resoudreClientParLibelle } = require('./parseur-generique');
 
   const mCmd = texte.match(/CF\/?(\d+)/);
   const numeroCommande = mCmd ? mCmd[1] : 'INCONNU';
@@ -660,10 +659,11 @@ async function parserProvidis(texte) {
   const mDateCmd = texte.match(/Date\s*\n(\d{2}\/\d{2}\/\d{4})/);
   const mDateLiv = texte.match(/(\d{2}\/\d{2}\/\d{4})\s*\nA livrer le/i);
 
-  // Ville client : juste apres notre propre adresse (LE PLANTAY)
-  const mClient = texte.match(/LE PLANTAY\s*\nTEL\s*\n\d{5}\s*\n([^\n]+)/i);
-  const texteClientBrut = mClient?.[1]?.trim();
-  const client = texteClientBrut ? await resoudreClientParLibelle(texteClientBrut) : null;
+  // Providis Logistique commande pour son propre compte (comme Distral) —
+  // client fixe, PAS de resolution dynamique par ville de livraison (la
+  // ville qui suit notre adresse est juste la destination finale, pas le
+  // client qui a emis la commande).
+  const client = 'PROVIDIS LOGISTIQUE';
 
   // Lignes produit : X<PCB> / designation / quantite / code reference
   const regLigne = /^X(\d+)\n(.+)\n(\d+)\n(\d+)$/gm;
