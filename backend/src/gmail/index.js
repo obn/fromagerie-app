@@ -153,7 +153,7 @@ async function traiterMessage(accessToken, messageId) {
           continue;
         }
 
-        const res = await insererCommande(commande, { gmailMessageId: messageId, dateReceptionMail: dateReceptionCalculee });
+        const res = await insererCommande(commande, { gmailMessageId: messageId, dateReceptionMail: dateReceptionCalculee, nomFichierPdf: filename });
         rapport.pdfs.push({ filename, statut: res.doublon ? 'doublon' : 'insere', ...res });
       } catch (e) {
         rapport.erreurs.push(`${filename} : ${e.message}`);

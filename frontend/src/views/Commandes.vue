@@ -72,6 +72,7 @@
       <div class="panel">
         <div class="panel-head">
           <h2>{{ panel.commande?.client_nom }} — N° {{ panel.commande?.numero_commande }}</h2>
+          <div v-if="panel.commande?.nom_fichier_pdf" style="color:#666; font-size:0.9rem; margin-top:4px">Fichier : {{ panel.commande.nom_fichier_pdf }}</div>
           <div style="display:flex;gap:8px">
             <button class="btn primary small" @click="ajouterLigne">+ Ligne</button>
             <button class="btn-ico" @click="panel.visible = false">✕</button>

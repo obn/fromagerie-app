@@ -173,6 +173,7 @@ async function insererCommande(commande, options = {}) {
     source:                   'gmail',
     gmail_message_id:         gmailMessageId,
     fichier_pdf_url:          fichierPdfUrl,
+    nom_fichier_pdf:          options.nomFichierPdf        || null,
   });
 
   if (dateLivraisonCalculee) {
