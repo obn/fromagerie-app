@@ -11,6 +11,7 @@
           <option value="">Tous mois</option>
           <option v-for="m in mois" :key="m.v" :value="m.v">{{ m.l }}</option>
         </select>
+        <button class="btn-ico" type="button" title="Produits période" @click="ouvrirProduitsPeriode">🧀</button>
         <button class="btn primary" @click="ouvrir()">+ Ajouter</button>
       </div>
     </div>
@@ -76,6 +77,32 @@
       </div>
     </div>
 
+    <!-- Panel produits consolidés pour la période -->
+    <div v-if="panelProduitsPeriodeOuvert" class="panel-overlay" @click.self="fermerPanelProduitsPeriode">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Produits — {{ titrePeriode }}</h2>
+          <button class="btn-ico" type="button" @click="fermerPanelProduitsPeriode" aria-label="Fermer">✕</button>
+        </div>
+
+        <div v-if="chargementProduitsPeriode" class="etat">Chargement…</div>
+
+        <table v-else class="tbl-lignes">
+          <thead><tr><th>Désignation</th><th>Qté</th><th>Unité</th></tr></thead>
+          <tbody>
+            <tr v-for="(p, idx) in produitsPeriode" :key="p.code || p.designation || idx">
+              <td>{{ p.designation }}</td>
+              <td class="num">{{ p.quantite }}</td>
+              <td>{{ p.unite || '—' }}</td>
+            </tr>
+            <tr v-if="!produitsPeriode.length">
+              <td colspan="3" class="empty-line">Aucun produit pour cette période.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Modal commande -->
     <Modal v-if="modal.visible" :titre="modal.item ? 'Modifier la commande' : 'Nouvelle commande'"
       @close="modal.visible = false" @confirm="sauvegarder">
@@ -127,7 +154,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { api } from '../services/api';
 import Modal from '../components/Modal.vue';
 import ConfirmSuppr from '../components/ConfirmSuppr.vue';
@@ -161,7 +188,66 @@ async function majLigneLot(ligne, valeur) {
     console.error('Échec sauvegarde N° lot', e);
   }
 }
+
+// panel produits periode
+const panelProduitsPeriodeOuvert = ref(false);
+const produitsPeriode = ref([]);
+const chargementProduitsPeriode = ref(false);
+
 const modalLigne = reactive({ visible: false, item: null });
+
+function titrePeriodeLabel() {
+  if (!filtres.annee && !filtres.mois) return 'Toutes commandes';
+  if (filtres.annee && !filtres.mois) return 'Année ' + filtres.annee;
+  if (filtres.annee && filtres.mois) {
+    const m = mois.find(x => x.v === filtres.mois);
+    return (m ? m.l : filtres.mois) + ' ' + filtres.annee;
+  }
+  return 'Période';
+}
+
+const titrePeriode = computed(() => titrePeriodeLabel());
+
+async function ouvrirProduitsPeriode() {
+  panelProduitsPeriodeOuvert.value = true;
+  chargementProduitsPeriode.value = true;
+  produitsPeriode.value = [];
+
+  try {
+    const ids = Array.from(new Set((commandes.value || []).map(c => c.id).filter(Boolean)));
+    if (!ids.length) { produitsPeriode.value = []; return; }
+
+    const promesses = ids.map(id => api.get('/commandes/' + id).catch(() => null));
+    const details = await Promise.all(promesses);
+    const toutesLignes = [];
+    details.forEach(d => {
+      if (d && Array.isArray(d.lignes)) d.lignes.forEach(l => toutesLignes.push(l));
+    });
+
+    const map = new Map();
+    toutesLignes.forEach(l => {
+      const key = (l.code_interne && String(l.code_interne).trim()) || (l.designation_brute && String(l.designation_brute).trim()) || '__inconnu__';
+      const quant = Number(l.quantite) || 0;
+      if (!map.has(key)) {
+        map.set(key, { designation: l.designation_brute || l.reference || key, code: l.code_interne, quantite: quant, unite: l.unite || '' });
+      } else {
+        const cur = map.get(key);
+        cur.quantite = (Number(cur.quantite) || 0) + quant;
+      }
+    });
+
+    const liste = Array.from(map.values()).sort((a,b) => String(a.designation).localeCompare(String(b.designation), 'fr'));
+    produitsPeriode.value = liste;
+  } finally {
+    chargementProduitsPeriode.value = false;
+  }
+}
+
+function fermerPanelProduitsPeriode() {
+  panelProduitsPeriodeOuvert.value = false;
+  produitsPeriode.value = [];
+  chargementProduitsPeriode.value = false;
+}
 const formLigne = ref({});
 
 const annees = [2024, 2025, 2026, 2027];
