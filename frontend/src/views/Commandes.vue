@@ -63,7 +63,9 @@
           <tbody>
             <tr v-for="l in panel.lignes" :key="l.id">
               <td>{{ l.designation_brute }}</td>
-              <td class="mono">{{ l.pcb || '—' }}</td>
+              <td>
+                <input type="number" class="field" :value="l.pcb !== null && l.pcb !== undefined ? l.pcb : ''" @change="majLignePcb(l, $event.target.value)" />
+              </td>
               <td class="num">{{ l.quantite }}</td>
               <td>
                 <input type="date" class="field field-dlc" :value="(l.dlc || '').slice(0,10)" @change="majLigneDlc(l, $event.target.value)" />
@@ -88,15 +90,16 @@
         <div v-if="chargementProduitsPeriode" class="etat">Chargement…</div>
 
         <table v-else class="tbl-lignes">
-          <thead><tr><th>Désignation</th><th>Qté</th><th>Unité</th></tr></thead>
+          <thead><tr><th>Désignation</th><th>Qté</th><th>PCB</th><th>Unité</th></tr></thead>
           <tbody>
             <tr v-for="(p, idx) in produitsPeriode" :key="p.code || p.designation || idx">
               <td>{{ p.designation }}</td>
               <td class="num">{{ p.quantite }}</td>
+              <td class="mono">{{ p.pcb != null ? p.pcb : '—' }}</td>
               <td>{{ p.unite || '—' }}</td>
             </tr>
             <tr v-if="!produitsPeriode.length">
-              <td colspan="3" class="empty-line">Aucun produit pour cette période.</td>
+              <td colspan="4" class="empty-line">Aucun produit pour cette période.</td>
             </tr>
           </tbody>
         </table>
@@ -189,6 +192,21 @@ async function majLigneLot(ligne, valeur) {
   }
 }
 
+async function majLignePcb(ligne, valeur) {
+  if (!panel.commande?.id || !ligne?.id) return;
+  let newVal = null;
+  if (valeur !== '' && valeur !== null && valeur !== undefined) {
+    const n = Number(valeur);
+    newVal = Number.isNaN(n) ? null : n;
+  }
+  try {
+    await api.patch('/commandes/' + panel.commande.id + '/lignes/' + ligne.id, { pcb: newVal });
+    ligne.pcb = newVal;
+  } catch (e) {
+    console.error('Échec sauvegarde PCB', e);
+  }
+}
+
 // panel produits periode
 const panelProduitsPeriodeOuvert = ref(false);
 const produitsPeriode = ref([]);
@@ -229,10 +247,11 @@ async function ouvrirProduitsPeriode() {
       const key = (l.code_interne && String(l.code_interne).trim()) || (l.designation_brute && String(l.designation_brute).trim()) || '__inconnu__';
       const quant = Number(l.quantite) || 0;
       if (!map.has(key)) {
-        map.set(key, { designation: l.designation_brute || l.reference || key, code: l.code_interne, quantite: quant, unite: l.unite || '' });
+        map.set(key, { designation: l.designation_brute || l.reference || key, code: l.code_interne, quantite: quant, unite: l.unite || '', pcb: l.pcb != null ? l.pcb : null });
       } else {
         const cur = map.get(key);
         cur.quantite = (Number(cur.quantite) || 0) + quant;
+        if (cur.pcb == null && l.pcb != null) cur.pcb = l.pcb;
       }
     });
 

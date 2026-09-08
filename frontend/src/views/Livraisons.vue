@@ -82,7 +82,9 @@
           <tbody>
             <tr v-for="ligne in lignesDetail" :key="ligne.id">
               <td>{{ ligne.designation_brute }}</td>
-              <td class="mono">{{ ligne.pcb || '—' }}</td>
+              <td>
+                <input type="number" class="field" :value="ligne.pcb !== null && ligne.pcb !== undefined ? ligne.pcb : ''" @change="majLignePcb(ligne, $event.target.value)" />
+              </td>
               <td class="num">{{ ligne.quantite }}</td>
               <td>
                 <input type="date" class="field field-dlc" :value="(ligne.dlc || '').slice(0,10)" @change="majLigneDlc(ligne, $event.target.value)" />
@@ -113,6 +115,7 @@
           <thead>
             <tr>
               <th>Qté</th>
+              <th>PCB</th>
               <th>Désignation</th>
               <th>Réf.</th>
               <th>Unité</th>
@@ -121,6 +124,7 @@
           <tbody>
             <tr v-for="(p, idx) in produitsJour" :key="p.code || p.designation || idx">
               <td class="num">{{ p.quantite }}</td>
+              <td class="mono">{{ p.pcb != null ? p.pcb : '—' }}</td>
               <td>{{ p.designation }}</td>
               <td class="mono">{{ p.code || '—' }}</td>
               <td>{{ p.unite || '—' }}</td>
@@ -147,6 +151,7 @@
           <thead>
             <tr>
               <th>Qté</th>
+              <th>PCB</th>
               <th>Désignation</th>
               <th>Réf.</th>
               <th>Unité</th>
@@ -155,6 +160,7 @@
           <tbody>
             <tr v-for="(p, idx) in produitsSemaine" :key="p.code || p.designation || idx">
               <td class="num">{{ p.quantite }}</td>
+              <td class="mono">{{ p.pcb != null ? p.pcb : '—' }}</td>
               <td>{{ p.designation }}</td>
               <td class="mono">{{ p.code || '—' }}</td>
               <td>{{ p.unite || '—' }}</td>
@@ -347,6 +353,22 @@ async function majLigneLot(ligne, valeur) {
   }
 }
 
+async function majLignePcb(ligne, valeur) {
+  const cid = commandeDetail.value?.id;
+  if (!cid || !ligne?.id) return;
+  let newVal = null;
+  if (valeur !== '' && valeur !== null && valeur !== undefined) {
+    const n = Number(valeur);
+    newVal = Number.isNaN(n) ? null : n;
+  }
+  try {
+    await api.patch('/commandes/' + cid + '/lignes/' + ligne.id, { pcb: newVal });
+    ligne.pcb = newVal;
+  } catch (e) {
+    console.error('Échec sauvegarde PCB', e);
+  }
+}
+
 async function ouvrirProduitsJour(jour) {
   panelProduitsOuvert.value = true;
   chargementProduits.value = true;
@@ -375,10 +397,11 @@ async function ouvrirProduitsJour(jour) {
       const key = (l.code_interne && String(l.code_interne).trim()) || (l.designation_brute && String(l.designation_brute).trim()) || '__inconnu__';
       const quant = Number(l.quantite) || 0;
       if (!map.has(key)) {
-        map.set(key, { designation: l.designation_brute || l.reference || key, code: l.code_interne, quantite: quant, unite: l.unite || '' });
+        map.set(key, { designation: l.designation_brute || l.reference || key, code: l.code_interne, quantite: quant, unite: l.unite || '', pcb: l.pcb != null ? l.pcb : null });
       } else {
         const cur = map.get(key);
         cur.quantite = (Number(cur.quantite) || 0) + quant;
+        if (cur.pcb == null && l.pcb != null) cur.pcb = l.pcb;
       }
     });
 
@@ -421,10 +444,11 @@ async function ouvrirProduitsSemaine() {
       const key = (l.code_interne && String(l.code_interne).trim()) || (l.designation_brute && String(l.designation_brute).trim()) || '__inconnu__';
       const quant = Number(l.quantite) || 0;
       if (!map.has(key)) {
-        map.set(key, { designation: l.designation_brute || l.reference || key, code: l.code_interne, quantite: quant, unite: l.unite || '' });
+        map.set(key, { designation: l.designation_brute || l.reference || key, code: l.code_interne, quantite: quant, unite: l.unite || '', pcb: l.pcb != null ? l.pcb : null });
       } else {
         const cur = map.get(key);
         cur.quantite = (Number(cur.quantite) || 0) + quant;
+        if (cur.pcb == null && l.pcb != null) cur.pcb = l.pcb;
       }
     });
 
