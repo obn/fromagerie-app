@@ -129,56 +129,107 @@ function parseQte(s) {
  }
 
 // ── SCAPALYON ────────────────────────────────────────────────────────────────
-function parserScapalyon(texte) {
-  const lignes = [];
+// Format bon de commande PDF Scapalyon. REMPLACE l'ancien parser (base sur
+// une regex de texte lineaire simple), incompatible avec le vrai format reel
+// ou un texte d'avertissement ("Veuillez impérativement nous envoyer...")
+// s'entrelace AU MILIEU de chaque ligne produit, rendant le texte pdf-parse
+// lineaire totalement ambigu (numeros et texte imbriques sans ordre logique).
+//
+// Comme Perrier / Le Relais Local, extraction par POSITION X REELLE
+// (pdfjs-dist) — le texte parasite "Veuillez..." est filtre par sa position
+// X propre (x≈64), distincte de la colonne designation (x≈100-320).
+//
+// Le PCB n'est pas donne directement mais SE CALCULE : Qte / Nbre Colis
+// (verifie exact sur le cas reel : coherent avec les mentions "X1"/"X6" deja
+// visibles dans les designations elles-memes).
+async function parserScapalyon(buffer) {
+  const pdfParse = require('pdf-parse');
+  const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+
+  // ── En-tete : via pdf-parse (texte lineaire, propre pour ces champs) ──────
+  const dataTexte = await pdfParse(buffer);
+  const texte = dataTexte.text;
 
   const mCmd = texte.match(/BCF\d+/);
   const numeroCommande = mCmd ? mCmd[0] : 'INCONNU';
 
-  // Date de livraison : "mercredi 24 juin 2026" ou "24/06/2026"
-  const mDateLiv = texte.match(/((?:lundi|mardi|mercredi|jeudi|vendredi)\s+\d+\s+\w+\s+\d{4})/i)
-    || texte.match(/livraison\s*:?\s*([0-9/]+)/i);
+  const mDateLiv = texte.match(/((?:lundi|mardi|mercredi|jeudi|vendredi)\s+\d+\s+\w+\s+\d{4})/i);
 
-  // Lignes : code numérique + quantité + unité + désignation
-  // Ex: "3244   12   Kg   PETIT FRAIS..."
-  const regLigne = /^(\d{4,6})\s+(\d+(?:[.,]\d+)?)\s+(Kg|KG|kg|pièce|piece|Pièce|l|L)?\s*(.+)$/gm;
-  let m;
-  while ((m = regLigne.exec(texte)) !== null) {
-    const des = m[4].trim();
-    if (!des || des.toUpperCase() === 'VEUILLEZ' || des.length < 3) continue;
-    // Détecter chevauchement ("Veuillez" seul = ligne incomplète)
-    const certitude = des.toLowerCase().startsWith('veuillez') ? 'non_fiable' : 'a_verifier';
-    lignes.push({
-      codeInterne: m[1],
-      gencod: null,
-      designationBrute: certitude === 'non_fiable' ? null : des,
-      quantite: parseQte(m[2]),
-      unite: m[3] || null,
-      certitude,
-      ligneBrute: m[0].trim(),
-    });
+  // ── Lignes produit : via pdfjs-dist (positions X reelles) ─────────────────
+  const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+  const page = await doc.getPage(1);
+  const content = await page.getTextContent();
+
+  const items = content.items
+    .map(it => ({ x: Math.round(it.transform[4]), y: Math.round(it.transform[5]), texte: it.str }))
+    .filter(it => it.texte.trim());
+
+  const lignesParY = {};
+  for (const it of items) {
+    const yKey = Math.round(it.y / 2) * 2;
+    lignesParY[yKey] = lignesParY[yKey] || [];
+    lignesParY[yKey].push(it);
+  }
+  const ys = Object.keys(lignesParY).map(Number).sort((a, b) => b - a);
+
+  const pivots = [];
+  for (const y of ys) {
+    const mots = lignesParY[y];
+    const refItem = mots.find(m => /^\d{4}$/.test(m.texte) && m.x < 30);
+    if (refItem) pivots.push({ y, reference: refItem.texte });
   }
 
-  // Lignes brutes avec "Veuillez" (chevauchement connu)
-  const regVeuillez = /^(\d{4,6})\s+Veuillez\s*(.*)$/gm;
-  while ((m = regVeuillez.exec(texte)) !== null) {
-    if (!lignes.find(l => l.codeInterne === m[1])) {
-      lignes.push({
-        codeInterne: m[1], gencod: null,
-        designationBrute: null, quantite: null, unite: null,
-        certitude: 'non_fiable', ligneBrute: m[0].trim(),
-      });
+  const lignes = [];
+  for (let i = 0; i < pivots.length; i++) {
+    const p = pivots[i];
+    const yMax = pivots[i - 1] ? (p.y + pivots[i - 1].y) / 2 : p.y + 15;
+    const yMin = pivots[i + 1] ? (p.y + pivots[i + 1].y) / 2 : p.y - 15;
+
+    const motsFenetre = [];
+    for (const y of ys) {
+      if (y >= yMax) continue;
+      if (y <= yMin) break;
+      motsFenetre.push(...lignesParY[y]);
     }
+
+    // Designation : x=100-320, en excluant le texte parasite "Veuillez..."
+    const fragmentsDesign = motsFenetre
+      .filter(m => m.x >= 100 && m.x < 320 && !m.texte.includes('Veuillez'))
+      .sort((a, b) => a.x - b.x);
+    const designation = fragmentsDesign.map(m => m.texte).join(' ').replace(/\s+/g, ' ').trim();
+
+    const trouve = (xCible, tolerance = 6) => motsFenetre.find(m => Math.abs(m.x - xCible) <= tolerance)?.texte;
+    const nbColisTexte = trouve(322);
+    const qteTexte = trouve(348);
+
+    const nbColis = nbColisTexte ? parseInt(nbColisTexte, 10) : null;
+    const qte = qteTexte ? parseFloat(qteTexte.replace(',', '.')) : null;
+    const pcb = (nbColis && qte) ? Math.round(qte / nbColis) : null;
+
+    if (!designation) continue;
+
+    lignes.push({
+      codeInterne: p.reference,
+      gencod: null,
+      designationBrute: designation,
+      quantite: nbColis,
+      unite: 'colis',
+      pcb,
+      certitude: 'haute', // extraction par coordonnees, fiable
+      ligneBrute: `${p.reference} | ${designation} | colis:${nbColis} | qte:${qte} | pcb:${pcb}`,
+    });
   }
 
   return {
     client: 'scapalyon',
     numeroCommande,
     dateCommande: null,
-    dateLivraison: parseDateFr(mDateLiv?.[1] || mDateLiv?.[0]),
+    dateLivraison: parseDateFr(mDateLiv?.[1]),
     lignes,
   };
 }
+
+module.exports = { parserScapalyon };
 
 // ── LOGIFRESH ────────────────────────────────────────────────────────────────
 // Format "Synthese globale des achats" / bon de commande plateforme Logifresh.
@@ -879,7 +930,7 @@ function detecterFournisseur(texte, nomFichier = '') {
 async function parserPdf(texte, nomFichier = '', buffer = null) {
   const fournisseur = detecterFournisseur(texte, nomFichier);
   if (fournisseur === 'distral')    return parserDistral(texte);
-  if (fournisseur === 'scapalyon')  return parserScapalyon(texte);
+  if (fournisseur === 'scapalyon') return await parserScapalyon(buffer);
   if (fournisseur === 'logifresh')  return parserLogifresh(texte);
   if (fournisseur === 'chez_andre') return await parserChezAndre(texte);
   if (fournisseur === 'biocoop')    return await parserBiocoop(texte);
