@@ -20,10 +20,30 @@
     <div v-else-if="!commandes.length" class="etat">Aucune commande pour cette période.</div>
 
     <div v-else class="table-wrap">
+      <!-- Bulk actions banner -->
+      <div v-if="selectedCount > 0" class="bulk-banner">
+        <span>{{ selectedCount }} commande(s) sélectionnée(s)</span>
+        <div style="margin-left:auto; display:flex; gap:8px">
+          <button class="btn" @click="supprSelection.visible = true">Supprimer la sélection</button>
+        </div>
+      </div>
+
       <table>
-        <thead><tr><th>N° commande</th><th>Client</th><th>Commande le</th><th>Livraison</th><th>Statut</th><th>Source</th><th></th></tr></thead>
+        <thead>
+          <tr>
+            <th><input type="checkbox" :checked="allSelected" @change="toggleAll($event.target.checked)" aria-label="Tout sélectionner" /></th>
+            <th>N° commande</th>
+            <th>Client</th>
+            <th>Commande le</th>
+            <th>Livraison</th>
+            <th>Statut</th>
+            <th>Source</th>
+            <th></th>
+          </tr>
+        </thead>
         <tbody>
           <tr v-for="c in commandes" :key="c.id">
+            <td class="td-check"><input type="checkbox" :checked="isSelected(c.id)" @change="toggleSelection(c.id, $event.target.checked)" class="check" /></td>
             <td class="mono">{{ c.numero_commande }}</td>
             <td><strong>{{ c.client_nom }}</strong></td>
             <td>{{ fmtDate(c.date_commande) }}</td>
@@ -161,6 +181,11 @@
       :message="`Supprimer la commande N° ${suppr.item?.numero_commande} ?`"
       @annuler="suppr.visible = false"
       @confirmer="confirmerSuppr" />
+
+    <ConfirmSuppr v-if="supprSelection.visible"
+      :message="`Supprimer ${selectedCount} commande(s) ?`"
+      @annuler="supprSelection.visible = false"
+      @confirmer="confirmerSupprSelection" />
   </div>
 </template>
 
@@ -221,6 +246,48 @@ const produitsPeriode = ref([]);
 const chargementProduitsPeriode = ref(false);
 
 const modalLigne = reactive({ visible: false, item: null });
+
+// Selection multiple commandes
+const commandesSelectionnees = ref(new Set());
+const supprSelection = reactive({ visible: false });
+const selectedCount = computed(() => commandesSelectionnees.value ? commandesSelectionnees.value.size : 0);
+const allSelected = computed(() => commandes.value && commandesSelectionnees.value && commandes.value.length > 0 && commandesSelectionnees.value.size === commandes.value.length);
+
+function isSelected(id) {
+  return commandesSelectionnees.value && commandesSelectionnees.value.has(id);
+}
+function toggleSelection(id, checked) {
+  const s = new Set(commandesSelectionnees.value || []);
+  if (checked) s.add(id); else s.delete(id);
+  commandesSelectionnees.value = s;
+}
+function toggleAll(checked) {
+  if (checked) {
+    commandesSelectionnees.value = new Set(commandes.value.map(c => c.id));
+  } else {
+    commandesSelectionnees.value = new Set();
+  }
+}
+
+async function confirmerSupprSelection() {
+  const ids = Array.from(commandesSelectionnees.value || []);
+  if (!ids.length) {
+    supprSelection.visible = false; return;
+  }
+  try {
+    // supprimer en parallele
+    await Promise.all(ids.map(id => api.delete('/commandes/' + id).catch(e => null)));
+    // retirer du tableau
+    commandes.value = commandes.value.filter(c => !ids.includes(c.id));
+    // vider la selection
+    commandesSelectionnees.value = new Set();
+  } catch (e) {
+    console.error('Échec suppression multiple', e);
+  } finally {
+    supprSelection.visible = false;
+  }
+}
+
 
 function titrePeriodeLabel() {
   if (!filtres.annee && !filtres.mois) return 'Toutes commandes';
@@ -380,6 +447,8 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .sel { padding: 7px 10px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.85rem; background: white; }
 .etat { padding: 40px; text-align: center; color: #7a8898; }
 .table-wrap { background: white; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); overflow: auto; }
+
+.bulk-banner { display:flex; align-items:center; gap:12px; padding:8px 12px; background:#fff4f0; border-bottom:1px solid #f0e0d8; color:#7a2f2f; font-weight:600; }
 table { width: 100%; border-collapse: collapse; font-size: 0.855rem; }
 thead { background: #f5f2e8; }
 th { padding: 9px 14px; text-align: left; font-size: 0.71rem; text-transform: uppercase; letter-spacing: 0.05em; color: #5a6070; font-weight: 600; border-bottom: 2px solid #e8e3d5; white-space: nowrap; }
