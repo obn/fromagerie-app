@@ -45,8 +45,11 @@
           <thead>
             <tr>
               <th class="th-check"></th>
-              <th>Produit</th>
-              <th class="th-fields">DLC / N° lot</th>
+              <th>Désignation</th>
+              <th>PCB</th>
+              <th>Qté</th>
+              <th>DLC</th>
+              <th>N° lot</th>
             </tr>
           </thead>
           <tbody>
@@ -65,14 +68,12 @@
                 />
               </td>
 
-              <!-- Produit -->
+              <!-- Désignation -->
               <td class="td-produit">
                 <div class="prodline">
-                  <span class="qty">{{ ligne.quantite }}<template v-if="ligne.unite"> {{ ligne.unite }}</template></span>
-
-                  <span v-if="ligne.certitude === 'non_fiable'" class="unsure-label">
-                    ⚠ ligne brute (chevauchement PDF, à relire) : "{{ ligne.ligne_brute }}"
-                  </span>
+                  <template v-if="ligne.certitude === 'non_fiable'">
+                    <span class="unsure-label">⚠ ligne brute (chevauchement PDF, à relire) : "{{ ligne.ligne_brute }}"</span>
+                  </template>
 
                   <template v-else>
                     <span
@@ -109,25 +110,35 @@
                 </div>
               </td>
 
-              <!-- DLC + Lot -->
-              <td class="td-fields">
-                <div class="fields">
-                  <input
-                    type="date"
-                    class="field field-dlc"
-                    autocomplete="off"
-                    :value="etats[ligne.id]?.dlc"
-                    @input="majEtat(ligne.id, 'dlc', $event.target.value)"
-                  />
-                  <input
-                    type="text"
-                    class="field field-lot"
-                    placeholder="Lot"
-                    autocomplete="off"
-                    :value="etats[ligne.id]?.lot"
-                    @input="majEtat(ligne.id, 'lot', $event.target.value)"
-                  />
-                </div>
+              <!-- PCB -->
+              <td>
+                <input type="number" class="field" :value="(etats[ligne.id]?.pcb !== undefined && etats[ligne.id]?.pcb !== null) ? etats[ligne.id].pcb : (ligne.pcb !== null && ligne.pcb !== undefined ? ligne.pcb : '')" @change="majLignePcb(ligne, $event.target.value)" />
+              </td>
+
+              <!-- Qté -->
+              <td class="num">{{ ligne.quantite }}<template v-if="ligne.unite"> {{ ligne.unite }}</template></td>
+
+              <!-- DLC -->
+              <td>
+                <input
+                  type="date"
+                  class="field field-dlc"
+                  autocomplete="off"
+                  :value="etats[ligne.id]?.dlc"
+                  @input="majEtat(ligne.id, 'dlc', $event.target.value)"
+                />
+              </td>
+
+              <!-- N° lot -->
+              <td>
+                <input
+                  type="text"
+                  class="field field-lot"
+                  placeholder="Lot"
+                  autocomplete="off"
+                  :value="etats[ligne.id]?.lot"
+                  @input="majEtat(ligne.id, 'lot', $event.target.value)"
+                />
               </td>
             </tr>
           </tbody>
@@ -213,6 +224,7 @@ async function charger() {
           lot:     ligne.numero_lot || '',
           produit: ligne.designation_brute || '',
           ref:     ligne.code_interne || ligne.gencod || '',
+          pcb:     ligne.pcb !== undefined && ligne.pcb !== null ? ligne.pcb : '',
         };
       }
     }
@@ -271,6 +283,34 @@ async function sauvegarderLigne(ligneId) {
     statutClass.value = 'ok';
   } catch (err) {
     statutMsg.value = 'Échec d\'enregistrement — ' + err.message;
+    statutClass.value = 'erreur';
+  }
+}
+
+// ── PCB sauvegarde immédiate (comme Commandes.vue) ─────────────────────────────
+async function majLignePcb(ligne, valeur) {
+  // trouver la commande parente
+  let commandeId = null;
+  for (const c of commandes.value) {
+    if ((c.lignes || []).some(l => l.id === ligne.id)) { commandeId = c.id; break; }
+  }
+  if (!commandeId || !ligne?.id) return;
+  let newVal = null;
+  if (valeur !== '' && valeur !== null && valeur !== undefined) {
+    const n = Number(valeur);
+    newVal = Number.isNaN(n) ? null : n;
+  }
+  try {
+    await api.patch(`/commandes/${commandeId}/lignes/${ligne.id}`, { pcb: newVal });
+    // mettre à jour l'état local
+    if (!etats[ligne.id]) etats[ligne.id] = {};
+    etats[ligne.id].pcb = newVal;
+    ligne.pcb = newVal;
+    statutMsg.value = 'Enregistré ✓';
+    statutClass.value = 'ok';
+  } catch (e) {
+    console.error('Échec sauvegarde PCB', e);
+    statutMsg.value = 'Échec d\'enregistrement — ' + (e.message || '');
     statutClass.value = 'erreur';
   }
 }
