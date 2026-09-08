@@ -72,23 +72,19 @@
         <table v-else class="tbl-lignes">
           <thead>
             <tr>
-              <th>Qté</th>
               <th>Désignation</th>
-              <th>Réf.</th>
-              <th>Prix</th>
-              <th>Certitude</th>
+              <th>PCB</th>
+              <th>Qté</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="ligne in lignesDetail" :key="ligne.id" :class="'cert-' + (ligne.certitude || 'a_verifier')">
-              <td class="num">{{ ligne.quantite }}</td>
+            <tr v-for="ligne in lignesDetail" :key="ligne.id">
               <td>{{ ligne.designation_brute }}</td>
-              <td class="mono">{{ ligne.code_interne || ligne.reference || ligne.gencod || '—' }}</td>
-              <td class="num prix">{{ formatPrix(ligne.tarif_net ?? ligne.prix) }}</td>
-              <td><span :class="['badge-cert', ligne.certitude || 'a_verifier']">{{ ligne.certitude || 'À vérifier' }}</span></td>
+              <td class="mono">{{ ligne.pcb || '—' }}</td>
+              <td class="num">{{ ligne.quantite }}</td>
             </tr>
             <tr v-if="!lignesDetail.length">
-              <td colspan="5" class="empty-line">Aucune ligne pour cette commande.</td>
+              <td colspan="3" class="empty-line">Aucune ligne pour cette commande.</td>
             </tr>
           </tbody>
         </table>
@@ -525,12 +521,7 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .tbl-lignes th { padding: 8px 14px; text-align: left; font-size: 0.71rem; text-transform: uppercase; color: #7a8898; border-bottom: 2px solid #e8e3d5; }
 .tbl-lignes td { padding: 9px 14px; border-bottom: 1px solid #f0ece0; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
-.prix { font-weight: 700; color: #1a2a4a; }
 .mono { font-family: monospace; font-size: 0.82rem; color: #4a7a5a; }
-.badge-cert { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
-.badge-cert.haute { background: #eef6ec; color: #2f6f4f; }
-.badge-cert.a_verifier { background: #fff3a0; color: #7a6000; }
-.badge-cert.non_fiable { background: #fde8e8; color: #b3261e; }
 .empty-line { text-align: center; color: #7a8898; }
 @media (max-width: 1000px) {
   .week-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }

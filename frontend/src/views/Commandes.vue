@@ -58,19 +58,12 @@
         </div>
         <div v-if="panel.chargement" class="etat">Chargement…</div>
         <table v-else class="tbl-lignes">
-          <thead><tr><th>Qté</th><th>Désignation</th><th>Réf. interne</th><th>Gencod</th><th>Prix</th><th>Certitude</th><th></th></tr></thead>
+          <thead><tr><th>Désignation</th><th>PCB</th><th>Qté</th></tr></thead>
           <tbody>
-            <tr v-for="l in panel.lignes" :key="l.id" :class="'cert-' + l.certitude">
-              <td class="num">{{ l.quantite }}</td>
+            <tr v-for="l in panel.lignes" :key="l.id">
               <td>{{ l.designation_brute }}</td>
-              <td class="mono">{{ l.code_interne || '—' }}</td>
-              <td class="mono">{{ l.gencod || '—' }}</td>
-              <td class="num prix">{{ l.tarif_net ? Number(l.tarif_net).toFixed(2) + ' €' : '—' }}</td>
-              <td><span :class="['badge-cert', l.certitude]">{{ l.certitude }}</span></td>
-              <td class="act">
-                <button class="btn-ico" @click="editerLigne(l)">✏️</button>
-                <button class="btn-ico rouge" @click="supprimerLigne(l)">✕</button>
-              </td>
+              <td class="mono">{{ l.pcb || '—' }}</td>
+              <td class="num">{{ l.quantite }}</td>
             </tr>
           </tbody>
         </table>
@@ -255,7 +248,6 @@ tr:last-child td { border-bottom: none; }
 tr:hover { background: #faf8f2; }
 .mono { font-family: monospace; font-size: 0.82rem; color: #4a7a5a; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
-.prix { font-weight: 700; color: #1a2a4a; }
 .act { display: flex; gap: 4px; }
 .btn-ico { border: none; background: transparent; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 0.88rem; }
 .btn-ico:hover { background: #f0ece0; }
@@ -268,10 +260,6 @@ tr:hover { background: #faf8f2; }
 .badge-src { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 .badge-src.gmail { background: #e8f0fe; color: #1a56b0; }
 .badge-src.manuel { background: #f0ece0; color: #5a4a30; }
-.badge-cert { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
-.badge-cert.haute { background: #eef6ec; color: #2f6f4f; }
-.badge-cert.a_verifier { background: #fff3a0; color: #7a6000; }
-.badge-cert.non_fiable { background: #fde8e8; color: #b3261e; }
 .panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 100; display: flex; justify-content: flex-end; }
 .panel { width: 640px; max-width: 95vw; background: white; height: 100%; overflow-y: auto; box-shadow: -4px 0 20px rgba(0,0,0,0.15); }
 .panel-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #e8e3d5; position: sticky; top: 0; background: white; z-index: 1; }
