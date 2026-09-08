@@ -261,14 +261,23 @@ function parserLogifresh(texte) {
   const lignes = codes.map((code, idx) => {
     const designation = designations[idx] || null;
     if (!designation) return null;
+
+    const mPcb = designation.match(/PCB\s*(\d+)/i);
+    const pcb = mPcb ? parseInt(mPcb[1], 10) : null;
+    const designationNettoyee = designation
+      .replace(/\s*PCB\s*\d+\s*/i, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
     return {
       codeInterne: code,
       gencod: null,
-      designationBrute: designation,
+      designationBrute: designationNettoyee,
       quantite: quantites[idx] ?? null,
       unite: null,
+      pcb,
       certitude: 'a_verifier', // extraction colonne recente, prudence par defaut
-      ligneBrute: `${code} | ${designation} | qte:${quantites[idx]}`,
+      ligneBrute: `${code} | ${designationNettoyee} | qte:${quantites[idx]}`,
     };
   }).filter(Boolean);
 
@@ -576,6 +585,78 @@ function convertirDate(dateStr) {
 
 module.exports = { parserPerrier };
 
+// ── PROVIDIS (plateforme AC2T, format "PROVIDIS LOGISTIQUE SAS") ──────────
+// Quatrieme format lie a l'agence AC2T (email adv@ac2t.net partage avec
+// AC2T/Leclerc et Perrier/Super U, mais structure de document totalement
+// differente). Genere par le logiciel de la societe PROVIDIS LOGISTIQUE.
+//
+// Format de ligne produit tres simple, 4 lignes de texte par produit :
+//   X4                              <- Condit. (PCB), prefixe par "X"
+//   BOUCHON APERITIF EPICE 100G     <- designation
+//   3                                <- Qte commandee
+//   40642                            <- code reference produit
+//
+// Le "client" n'est pas nomme explicitement (pas d'enseigne du type "Super U")
+// mais la ville de livraison apparait juste apres notre propre adresse
+// (LE PLANTAY) — utilisee pour le rapprochement dynamique avec la table
+// clients (meme mecanisme que Chez Andre / AC2T / Biocoop).
+async function parserProvidis(texte) {
+  const { resoudreClientParLibelle } = require('./parseur-generique');
+
+  const mCmd = texte.match(/CF\/?(\d+)/);
+  const numeroCommande = mCmd ? mCmd[1] : 'INCONNU';
+
+  const mDateCmd = texte.match(/Date\s*\n(\d{2}\/\d{2}\/\d{4})/);
+  const mDateLiv = texte.match(/(\d{2}\/\d{2}\/\d{4})\s*\nA livrer le/i);
+
+  // Ville client : juste apres notre propre adresse (LE PLANTAY)
+  const mClient = texte.match(/LE PLANTAY\s*\nTEL\s*\n\d{5}\s*\n([^\n]+)/i);
+  const texteClientBrut = mClient?.[1]?.trim();
+  const client = texteClientBrut ? await resoudreClientParLibelle(texteClientBrut) : null;
+
+  // Lignes produit : X<PCB> / designation / quantite / code reference
+  const regLigne = /^X(\d+)\n(.+)\n(\d+)\n(\d+)$/gm;
+
+  const lignes = [];
+  let m;
+  while ((m = regLigne.exec(texte)) !== null) {
+    const pcb = parseInt(m[1], 10);
+    const designation = m[2].trim();
+    const quantite = parseInt(m[3], 10);
+    const codeReference = m[4];
+
+    if (!designation) continue;
+
+    lignes.push({
+      codeInterne: codeReference,
+      gencod: null,
+      designationBrute: designation,
+      quantite,
+      unite: null,
+      pcb,
+      certitude: 'haute',
+      ligneBrute: `X${pcb} | ${designation} | qte:${quantite} | code:${codeReference}`,
+    });
+  }
+
+  return {
+    client,
+    numeroCommande,
+    dateCommande: mDateCmd ? convertirDate(mDateCmd[1]) : null,
+    dateLivraison: mDateLiv ? convertirDate(mDateLiv[1]) : null,
+    lignes,
+  };
+}
+
+function convertirDate(dateStr) {
+  const m = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!m) return null;
+  const [, j, mo, a] = m;
+  return `${a}-${mo}-${j}`;
+}
+
+module.exports = { parserProvidis };
+
 async function parserChezAndre(texte) {
   const { resoudreClientParLibelle } = require('./parseur-generique');
 
@@ -666,6 +747,7 @@ function detecterFournisseur(texte, nomFichier = '') {
   if (t.includes('piècecolis') || t.includes('site de livraison')) return 'chez_andre';
   if (t.includes('biocoop') || f.includes('biocoop')) return 'biocoop';
   if (t.includes('perrier')) return 'perrier';
+  if (t.includes('providis')) return 'providis';
   if (t.includes('ac2t')) return 'ac2t';
   return null;
 }
@@ -679,6 +761,7 @@ async function parserPdf(texte, nomFichier = '', buffer = null) {
   if (fournisseur === 'biocoop')    return await parserBiocoop(texte);
   if (fournisseur === 'ac2t')       return await parserAC2T(texte);
   if (fournisseur === 'perrier') return await parserPerrier(buffer);
+  if (fournisseur === 'providis') return await parserProvidis(texte);
 
   // Fournisseur inconnu — retourner les lignes brutes avec certitude nulle
   console.warn(`[parser] Fournisseur non identifié pour "${nomFichier}" — mode brut`);
@@ -698,4 +781,4 @@ async function parserPdf(texte, nomFichier = '', buffer = null) {
   };
 }
 
-module.exports = { parserPdf, parserDistral, parserScapalyon, parserLogifresh, parserChezAndre, detecterFournisseur, parseDateFr, parserBiocoop, parserAC2T,parserPerrier };
+module.exports = { parserPdf, parserDistral, parserScapalyon, parserLogifresh, parserChezAndre, detecterFournisseur, parseDateFr, parserBiocoop, parserAC2T,parserPerrier,parserProvidis};
