@@ -173,7 +173,7 @@ function fmtDate(d) {
   // (ex: '2026-07-04T00:00:00.000Z') selon le driver MySQL — on ne garde
   // que la partie date pour eviter un "Invalid Date" en concatenant deux fois l'heure.
   const datePart = String(d).slice(0, 10);
-  return new Date(datePart + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(datePart + 'T12:00:00').toLocaleDateString('fr-FR');
 }
 
 // ── Données ───────────────────────────────────────────────────────────────────
