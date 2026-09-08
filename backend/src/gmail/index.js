@@ -133,7 +133,7 @@ async function traiterMessage(accessToken, messageId) {
         if (parseurConfigure) {
           commande = await  appliquerParseurConfigure(pdfData.text, parseurConfigure);
         } else {
-          commande = await parserPdf(pdfData.text, filename);
+          commande = await parserPdf(pdfData.text, filename, buffer);
 
           // Fournisseur non reconnu par aucun parseur configure -> dernier recours via IA
           /*

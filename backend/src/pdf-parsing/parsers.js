@@ -460,6 +460,121 @@ function convertirDate(dateStr) {
   const [, j, mo, a] = m;
   return `${a}-${mo}-${j}`;
 }
+// ── PERRIER (plateforme AC2T, format "Bon de commande Nr.") ────────────────
+// Troisieme format lie a l'agence AC2T (distinct du template "Agence AC2T"
+// deja gere par parserAC2T) — genere par le logiciel "PERRIER", utilise
+// notamment par le reseau Super U. Le PCB correspond a la colonne "Cdt."
+// (Conditionnement).
+//
+// PARTICULARITE TECHNIQUE : contrairement a tous les autres fournisseurs,
+// le texte extrait par pdf-parse (lineaire) est ICI AMBIGU de facon
+// insoluble par regex — le nombre de chiffres du PCB (1 ou 2) ne peut pas
+// etre determine de facon fiable a partir du texte concatene seul (deux
+// interpretations differentes peuvent toutes deux "coller" aux totaux
+// verifies par calcul). On utilise donc pdfjs-dist pour recuperer la
+// POSITION X REELLE de chaque bloc de texte sur la page, ce qui permet de
+// separer les colonnes sans aucune ambiguite (Cdt a x≈258-262, Qte UC a
+// x≈328-331, etc. — positions fixes du gabarit PERRIER).
+//
+// Les champs d'en-tete (numero, dates, client) restent extraits via
+// pdf-parse classique (texte lineaire), qui les donne deja proprement.
+const pdfParse = require('pdf-parse');
+const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+
+async function parserPerrier(buffer) {
+  const { resoudreClientParLibelle } = require('./parseur-generique');
+
+  // ── En-tete : via pdf-parse (texte lineaire, deja propre pour ces champs) ──
+  const dataTexte = await pdfParse(buffer);
+  const texte = dataTexte.text;
+
+  const mNum = texte.match(/Bon de commande Nr\.\s*(\d+)/i);
+  const numeroCommande = mNum ? mNum[1] : 'INCONNU';
+
+  const mDateLiv = texte.match(/Date livraison(\d{2}\/\d{2}\/\d{4})/i);
+  const mDateCmd = texte.match(/Le\s+(\d{2}\/\d{2}\/\d{4})\s+à/i);
+
+  const mClient = texte.match(/\n((?:Super U|Intermarché|Carrefour|Leclerc|U Express)[^\n]+)\n/i);
+  const texteClientBrut = mClient?.[1]?.trim();
+  const client = texteClientBrut ? await resoudreClientParLibelle(texteClientBrut) : null;
+
+  // ── Lignes produit : via pdfjs-dist (positions X reelles, sans ambiguite) ──
+  const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+  const page = await doc.getPage(1);
+  const content = await page.getTextContent();
+
+  const items = content.items
+    .map(it => ({ x: Math.round(it.transform[4]), y: Math.round(it.transform[5]), texte: it.str }))
+    .filter(it => it.texte.trim());
+
+  const lignesParY = {};
+  for (const it of items) {
+    const yKey = Math.round(it.y / 2) * 2;
+    lignesParY[yKey] = lignesParY[yKey] || [];
+    lignesParY[yKey].push(it);
+  }
+  const ys = Object.keys(lignesParY).map(Number).sort((a, b) => b - a);
+
+  // Lignes "pivot" = celles contenant un gencode (13 chiffres) en debut de colonne
+  const pivots = [];
+  for (const y of ys) {
+    const mots = lignesParY[y];
+    const gencodeItem = mots.find(m => /^\d{13}$/.test(m.texte) && m.x < 40);
+    if (gencodeItem) pivots.push({ y, gencode: gencodeItem.texte, mots: mots.sort((a, b) => a.x - b.x) });
+  }
+
+  const lignes = [];
+  for (let i = 0; i < pivots.length; i++) {
+    const p = pivots[i];
+    // Frontieres = milieu entre pivots voisins (gere les designations qui
+    // s'enroulent au-dessus ET en dessous de leur propre ligne de gencode)
+    const yMax = pivots[i - 1] ? (p.y + pivots[i - 1].y) / 2 : p.y + 15;
+    const yMin = pivots[i + 1] ? (p.y + pivots[i + 1].y) / 2 : p.y - 15;
+
+    const fragments = [];
+    for (const y of ys) {
+      if (y >= yMax) continue;
+      if (y <= yMin) break;
+      const mots = lignesParY[y].filter(m => m.x >= 100 && m.x < 250);
+      for (const m of mots.sort((a, b) => a.x - b.x)) fragments.push(m.texte);
+    }
+    const designation = fragments.join(' ').replace(/\s+/g, ' ').trim();
+
+    const trouve = (xCible, tolerance = 8) => p.mots.find(m => Math.abs(m.x - xCible) <= tolerance)?.texte;
+    const pcbTexte = trouve(258) || trouve(262);
+    const qteUCTexte = trouve(328) || trouve(331);
+
+    if (!designation) continue;
+
+    lignes.push({
+      codeInterne: null,
+      gencod: p.gencode,
+      designationBrute: designation,
+      quantite: qteUCTexte ? parseInt(qteUCTexte, 10) : null,
+      unite: null,
+      pcb: pcbTexte ? parseInt(pcbTexte, 10) : null,
+      certitude: 'haute', // extraction par coordonnees, fiable
+      ligneBrute: `${p.gencode} | ${designation} | pcb:${pcbTexte} | qte:${qteUCTexte}`,
+    });
+  }
+
+  return {
+    client,
+    numeroCommande,
+    dateCommande: mDateCmd ? convertirDate(mDateCmd[1]) : null,
+    dateLivraison: mDateLiv ? convertirDate(mDateLiv[1]) : null,
+    lignes,
+  };
+}
+
+function convertirDate(dateStr) {
+  const m = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!m) return null;
+  const [, j, mo, a] = m;
+  return `${a}-${mo}-${j}`;
+}
+
+module.exports = { parserPerrier };
 
 async function parserChezAndre(texte) {
   const { resoudreClientParLibelle } = require('./parseur-generique');
@@ -550,11 +665,12 @@ function detecterFournisseur(texte, nomFichier = '') {
   if (t.includes('logifresh') || f.includes('logifresh')) return 'logifresh';
   if (t.includes('piècecolis') || t.includes('site de livraison')) return 'chez_andre';
   if (t.includes('biocoop') || f.includes('biocoop')) return 'biocoop';
+  if (t.includes('perrier')) return 'perrier';
   if (t.includes('ac2t')) return 'ac2t';
   return null;
 }
 
-async function parserPdf(texte, nomFichier = '') {
+async function parserPdf(texte, nomFichier = '', buffer = null) {
   const fournisseur = detecterFournisseur(texte, nomFichier);
   if (fournisseur === 'distral')    return parserDistral(texte);
   if (fournisseur === 'scapalyon')  return parserScapalyon(texte);
@@ -562,6 +678,7 @@ async function parserPdf(texte, nomFichier = '') {
   if (fournisseur === 'chez_andre') return await parserChezAndre(texte);
   if (fournisseur === 'biocoop')    return await parserBiocoop(texte);
   if (fournisseur === 'ac2t')       return await parserAC2T(texte);
+  if (fournisseur === 'perrier') return await parserPerrier(buffer);
 
   // Fournisseur inconnu — retourner les lignes brutes avec certitude nulle
   console.warn(`[parser] Fournisseur non identifié pour "${nomFichier}" — mode brut`);
@@ -581,4 +698,4 @@ async function parserPdf(texte, nomFichier = '') {
   };
 }
 
-module.exports = { parserPdf, parserDistral, parserScapalyon, parserLogifresh, parserChezAndre, detecterFournisseur, parseDateFr, parserBiocoop, parserAC2T };
+module.exports = { parserPdf, parserDistral, parserScapalyon, parserLogifresh, parserChezAndre, detecterFournisseur, parseDateFr, parserBiocoop, parserAC2T,parserPerrier };
