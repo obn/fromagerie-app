@@ -226,6 +226,7 @@ async function insererCommande(commande, options = {}) {
       designation_brute: ligne.designationBrute  || null,
       quantite:          ligne.quantite           || null,
       unite:             ligne.unite              || null,
+      pcb:               ligne.pcb               || null,
       certitude,
       ligne_brute:       ligne.ligneBrute         || null,
     });
