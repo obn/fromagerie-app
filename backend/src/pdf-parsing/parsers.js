@@ -213,38 +213,111 @@ function parserScapalyon(texte) {
 }
 
 // ── LOGIFRESH ────────────────────────────────────────────────────────────────
+// Format "Synthese globale des achats" / bon de commande plateforme Logifresh.
+// PDF de 2 pages : la page 1 ("Synthese globale") peut potentiellement agreger
+// PLUSIEURS commandes distinctes — on parse donc exclusivement la PAGE 2
+// ("No commande : XXXXXX"), qui correspond a UNE seule commande identifiee.
+//
+// Extraction en mode COLONNE (pas en blocs par produit comme les autres
+// fournisseurs) : le texte liste d'abord TOUS les codes produits, puis TOUTES
+// les designations, puis TOUTES les quantites — dans le meme ordre. On les
+// recombine par position (1er code <-> 1ere designation <-> 1ere quantite).
+//
+// Pattern reel observe (texte pdf-parse, ligne par ligne apres "No commande") :
+//   2932800                                  <- codes (6-8 chiffres), N lignes
+//   2934300
+//   3744600
+//   BOUCHON BIO APERO 7 EPICES PCB 10        <- designations, chacune se termine
+//   FE STK                                      par le marqueur "STK"
+//   BOUCHON BIO APERO VIN BLANC PCB
+//   10 FE STK
+//   REGAL S/SOUCI BIO FERMIER 200G
+//   PCB 6 FE STK
+//   20                                        <- quantites, N premieres lignes
+//   35                                           purement numeriques rencontrees
+//   5                                            (le reste du bloc — poids, prix,
+//   0.100                                        unites, totaux — est ignore)
+//   ...
+//   60                                        <- ATTENTION : ceci est un total
+//   TOTAL COMMANDE                               recapitulatif, pas une 4e quantite
+//                                                 (exclu car on s'arrete a N=3)
 function parserLogifresh(texte) {
-  const lignes = [];
+  // Client + numero de compte (fiables, presents sur les 2 pages)
+  const mClient = texte.match(/CLIENT\s+(\S+)\s+(\d+)/);
+  const clientBrut = mClient?.[1] || null;
+  const numeroCommande = mClient?.[2] || 'INCONNU';
 
-  const mCmd = texte.match(/(?:commande|bon)\s*(?:n[°o])?\s*:?\s*(\d+)/i);
-  const numeroCommande = mCmd ? mCmd[1] : 'INCONNU';
+  // Date de reception/livraison prevue (la seule date non ambigue du document ;
+  // le "Date commande" n'a pas de valeur distincte fiable dans ce format —
+  // laissee a null plutot que de deviner).
+  const mDateLiv = texte.match(/Date\s+récep\.\s+prév\s*:[\s\S]*?(\d{2}\/\d{2}\/\d{4})/i);
+  const dateLivraison = mDateLiv ? convertirDate(mDateLiv[1]) : null;
 
-  const mDate = texte.match(/(\d{2}\/\d{2}\/\d{4})/);
+  // Page 2 = "No commande : XXXXXX", identifie UNE seule commande (contrairement
+  // a la page 1 "Synthese globale" qui pourrait en agreger plusieurs)
+  const idxPage2 = texte.lastIndexOf('No commande');
+  const zoneTexte = idxPage2 >= 0 ? texte.slice(idxPage2) : texte;
+  const lignesTexte = zoneTexte.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-  // Logifresh envoie des refs fournisseur longues (7 chiffres) + quantité + désignation
-  const regLigne = /^(\d{7})\s+(\d+(?:[.,]\d+)?)\s+(.+)$/gm;
-  let m;
-  while ((m = regLigne.exec(texte)) !== null) {
-    const des = m[3].trim();
-    if (!des || des.length < 3) continue;
-    lignes.push({
-      codeInterne: m[1],   // ref fournisseur, à résoudre via codes_internes
-      gencod: null,
-      designationBrute: des,
-      quantite: parseQte(m[2]),
-      unite: null,
-      certitude: 'a_verifier',
-      ligneBrute: m[0].trim(),
-    });
+  let i = 0;
+  while (i < lignesTexte.length && !/^\d{6,8}$/.test(lignesTexte[i])) i++;
+  const codes = [];
+  while (i < lignesTexte.length && /^\d{6,8}$/.test(lignesTexte[i])) {
+    codes.push(lignesTexte[i]);
+    i++;
+  }
+  const n = codes.length;
+
+  const designations = [];
+  let courant = [];
+  while (i < lignesTexte.length && designations.length < n) {
+    courant.push(lignesTexte[i]);
+    if (lignesTexte[i].includes('STK')) {
+      const texteDesignation = courant.join(' ')
+        .replace(/\bSTK\b/, '')
+        .replace(/\bFE\b\s*$/, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      designations.push(texteDesignation);
+      courant = [];
+    }
+    i++;
   }
 
+  const quantites = [];
+  while (i < lignesTexte.length && quantites.length < n) {
+    if (/^\d+$/.test(lignesTexte[i])) quantites.push(parseInt(lignesTexte[i], 10));
+    i++;
+  }
+
+  const lignes = codes.map((code, idx) => {
+    const designation = designations[idx] || null;
+    if (!designation) return null;
+    return {
+      codeInterne: code,
+      gencod: null,
+      designationBrute: designation,
+      quantite: quantites[idx] ?? null,
+      unite: null,
+      certitude: 'a_verifier', // extraction colonne recente, prudence par defaut
+      ligneBrute: `${code} | ${designation} | qte:${quantites[idx]}`,
+    };
+  }).filter(Boolean);
+
   return {
-    client: 'logifresh',
+    client: clientBrut, // resolu ensuite via nom OU nom_facture (ex: LOGIFRESH -> AUCHAN)
     numeroCommande,
-    dateCommande: parseDateFr(mDate?.[1]),
-    dateLivraison: parseDateFr(mDate?.[1]),
+    dateCommande: null,
+    dateLivraison,
     lignes,
   };
+}
+
+function convertirDate(dateStr) {
+  const m = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!m) return null;
+  const [, j, mo, a] = m;
+  return `${a}-${mo}-${j}`;
 }
 
 async function parserChezAndre(texte) {
