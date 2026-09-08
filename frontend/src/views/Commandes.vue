@@ -90,16 +90,24 @@
         <div v-if="chargementProduitsPeriode" class="etat">Chargement…</div>
 
         <table v-else class="tbl-lignes">
-          <thead><tr><th>Désignation</th><th>Qté</th><th>PCB</th><th>Unité</th></tr></thead>
+          <thead><tr><th>Désignation</th><th>Qté</th><th>PCB</th><th>Qté totale</th><th>Unité</th></tr></thead>
           <tbody>
             <tr v-for="(p, idx) in produitsPeriode" :key="p.code || p.designation || idx">
               <td>{{ p.designation }}</td>
               <td class="num">{{ p.quantite }}</td>
               <td class="mono">{{ p.pcb != null ? p.pcb : '—' }}</td>
+              <td class="num">{{ p.pcb != null ? (Number(p.quantite) * Number(p.pcb)) : '—' }}</td>
               <td>{{ p.unite || '—' }}</td>
             </tr>
             <tr v-if="!produitsPeriode.length">
-              <td colspan="4" class="empty-line">Aucun produit pour cette période.</td>
+              <td colspan="5" class="empty-line">Aucun produit pour cette période.</td>
+            </tr>
+            <tr v-if="produitsPeriode.length" class="total-row">
+              <td><strong>Total</strong></td>
+              <td></td>
+              <td></td>
+              <td class="num">{{ produitsPeriode.reduce((s,p) => (p.pcb != null ? s + (Number(p.quantite) * Number(p.pcb)) : s), 0) }}</td>
+              <td></td>
             </tr>
           </tbody>
         </table>
@@ -402,4 +410,6 @@ tr:hover { background: #faf8f2; }
 label { display: flex; flex-direction: column; gap: 5px; font-size: 0.85rem; font-weight: 600; color: #3a4a5a; }
 .inp { padding: 8px 10px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.875rem; width: 100%; box-sizing: border-box; }
 .inp:focus { outline: none; border-color: #2f6f4f; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
+
+.tbl-lignes .total-row td { font-weight: 700; background: #f5f5f5; border-top: 2px solid #e8e3d5; }
 </style>

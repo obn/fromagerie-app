@@ -116,6 +116,7 @@
             <tr>
               <th>Qté</th>
               <th>PCB</th>
+              <th>Qté totale</th>
               <th>Désignation</th>
               <th>Réf.</th>
               <th>Unité</th>
@@ -125,12 +126,21 @@
             <tr v-for="(p, idx) in produitsJour" :key="p.code || p.designation || idx">
               <td class="num">{{ p.quantite }}</td>
               <td class="mono">{{ p.pcb != null ? p.pcb : '—' }}</td>
+              <td class="num">{{ p.pcb != null ? (Number(p.quantite) * Number(p.pcb)) : '—' }}</td>
               <td>{{ p.designation }}</td>
               <td class="mono">{{ p.code || '—' }}</td>
               <td>{{ p.unite || '—' }}</td>
             </tr>
             <tr v-if="!produitsJour.length">
-              <td colspan="4" class="empty-line">Aucun produit pour cette journée.</td>
+              <td colspan="6" class="empty-line">Aucun produit pour cette journée.</td>
+            </tr>
+            <tr v-if="produitsJour.length" class="total-row">
+              <td></td>
+              <td></td>
+              <td class="num">{{ produitsJour.reduce((s,p) => (p.pcb != null ? s + (Number(p.quantite) * Number(p.pcb)) : s), 0) }}</td>
+              <td><strong>Total</strong></td>
+              <td></td>
+              <td></td>
             </tr>
           </tbody>
         </table>
@@ -152,6 +162,7 @@
             <tr>
               <th>Qté</th>
               <th>PCB</th>
+              <th>Qté totale</th>
               <th>Désignation</th>
               <th>Réf.</th>
               <th>Unité</th>
@@ -161,12 +172,21 @@
             <tr v-for="(p, idx) in produitsSemaine" :key="p.code || p.designation || idx">
               <td class="num">{{ p.quantite }}</td>
               <td class="mono">{{ p.pcb != null ? p.pcb : '—' }}</td>
+              <td class="num">{{ p.pcb != null ? (Number(p.quantite) * Number(p.pcb)) : '—' }}</td>
               <td>{{ p.designation }}</td>
               <td class="mono">{{ p.code || '—' }}</td>
               <td>{{ p.unite || '—' }}</td>
             </tr>
             <tr v-if="!produitsSemaine.length">
-              <td colspan="4" class="empty-line">Aucun produit pour cette semaine.</td>
+              <td colspan="6" class="empty-line">Aucun produit pour cette semaine.</td>
+            </tr>
+            <tr v-if="produitsSemaine.length" class="total-row">
+              <td></td>
+              <td></td>
+              <td class="num">{{ produitsSemaine.reduce((s,p) => (p.pcb != null ? s + (Number(p.quantite) * Number(p.pcb)) : s), 0) }}</td>
+              <td><strong>Total</strong></td>
+              <td></td>
+              <td></td>
             </tr>
           </tbody>
         </table>
@@ -584,4 +604,6 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
   .week-grid { grid-template-columns: 1fr; }
   .week-range { min-width: 0; }
 }
+
+.tbl-lignes .total-row td { font-weight: 700; background: #f5f5f5; border-top: 2px solid #e8e3d5; }
 </style>
