@@ -108,13 +108,21 @@
 
               <!-- DLC -->
               <td>
-                <input
-                  type="date"
-                  class="field field-dlc"
-                  autocomplete="off"
-                  :value="etats[ligne.id]?.dlc"
-                  @input="majEtat(ligne.id, 'dlc', $event.target.value)"
-                />
+                <template v-if="!isEditingDlc(ligne.id)">
+                  <span class="dlc-text" @click="openEditDlc(ligne.id)">
+                    {{ etats[ligne.id]?.dlc ? new Date(etats[ligne.id].dlc).toLocaleDateString('fr-FR') : '—' }}
+                  </span>
+                </template>
+                <template v-else>
+                  <input
+                    type="date"
+                    class="field field-dlc"
+                    autocomplete="off"
+                    :value="etats[ligne.id]?.dlc"
+                    @change="(e) => { majEtat(ligne.id, 'dlc', e.target.value); closeEditDlc(ligne.id); }"
+                    @blur="() => closeEditDlc(ligne.id)"
+                  />
+                </template>
               </td>
 
               <!-- N° lot -->
@@ -184,6 +192,12 @@ const etats = reactive({});          // { [ligneId]: { fait, dlc, lot, produit, 
 const editId = ref(null);            // id de la ligne dont la designation est en edition
 const statutMsg = ref('Chargement de l\'historique…');
 const statutClass = ref('');
+
+// Edition DLC inline
+const editingDlc = ref(new Set());
+function openEditDlc(id) { const s = new Set(editingDlc.value || []); s.add(id); editingDlc.value = s; }
+function closeEditDlc(id) { const s = new Set(editingDlc.value || []); s.delete(id); editingDlc.value = s; }
+function isEditingDlc(id) { return editingDlc.value && editingDlc.value.has(id); }
 
 const nbTotal = computed(() =>
   commandes.value.reduce((acc, c) => acc + (c.lignes?.length || 0), 0)
@@ -404,6 +418,7 @@ tr.unsure:not(.done):hover td { background: #fff5e0; }
 .field:focus { outline: none; border-color: #2f6f4f; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
 .field-dlc { width: 120px; max-width: 120px; }
 .field-lot { width: 60px; }
+.dlc-text { cursor: pointer; color: #1a2a4a; }
 
 .footer-note { margin: 18px 0 0; font-size: 0.78rem; color: #7a8898; }
 .reset-btn { background: #b3261e; color: white; border: none; padding: 8px 18px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }

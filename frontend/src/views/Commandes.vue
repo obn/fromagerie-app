@@ -89,7 +89,12 @@
               </td>
               <td class="num">{{ l.quantite }}</td>
               <td>
-                <input type="date" class="field field-dlc" :value="(l.dlc || '').slice(0,10)" @change="majLigneDlc(l, $event.target.value)" />
+                <template v-if="!isEditingDlcPanel(l.id)">
+                  <span class="dlc-text" @click="openEditDlcPanel(l.id)">{{ fmtDate(l.dlc) }}</span>
+                </template>
+                <template v-else>
+                  <input type="date" class="field field-dlc" :value="(l.dlc || '').slice(0,10)" @change="(e) => saveDlcAndClose(l, e.target.value)" @blur="() => closeEditDlcPanel(l.id)" />
+                </template>
               </td>
               <td>
                 <input type="text" class="field" :value="l.numero_lot || ''" @change="majLigneLot(l, $event.target.value)" />
@@ -247,6 +252,13 @@ const produitsPeriode = ref([]);
 const chargementProduitsPeriode = ref(false);
 
 const modalLigne = reactive({ visible: false, item: null });
+
+// Edition DLC inline dans le panel de détail
+const editingDlcPanel = ref(new Set());
+function openEditDlcPanel(id) { const s = new Set(editingDlcPanel.value || []); s.add(id); editingDlcPanel.value = s; }
+function closeEditDlcPanel(id) { const s = new Set(editingDlcPanel.value || []); s.delete(id); editingDlcPanel.value = s; }
+function isEditingDlcPanel(id) { return editingDlcPanel.value && editingDlcPanel.value.has(id); }
+async function saveDlcAndClose(ligne, valeur) { await majLigneDlc(ligne, valeur); closeEditDlcPanel(ligne.id); }
 
 // Selection multiple commandes
 const commandesSelectionnees = ref(new Set());
@@ -477,6 +489,7 @@ tr:hover { background: #faf8f2; }
 .tbl-lignes { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .tbl-lignes th { padding: 8px 14px; text-align: left; font-size: 0.71rem; text-transform: uppercase; color: #7a8898; border-bottom: 2px solid #e8e3d5; }
 .tbl-lignes td { padding: 9px 14px; border-bottom: 1px solid #f0ece0; vertical-align: middle; }
+.dlc-text { cursor: pointer; color: #1a2a4a; }
 label { display: flex; flex-direction: column; gap: 5px; font-size: 0.85rem; font-weight: 600; color: #3a4a5a; }
 .inp { padding: 8px 10px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.875rem; width: 100%; box-sizing: border-box; }
 .inp:focus { outline: none; border-color: #2f6f4f; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
