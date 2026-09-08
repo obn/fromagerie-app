@@ -6,7 +6,9 @@
         <p class="subtitle">{{ dateAffichee }}</p>
       </div>
       <div class="toolbar">
+        <button class="btn-nav" type="button" @click="prevDay" aria-label="Jour précédent">◀</button>
         <input type="date" v-model="dateSelectionnee" @change="charger" class="sel" />
+        <button class="btn-nav" type="button" @click="nextDay" aria-label="Jour suivant">▶</button>
         <span class="count-badge">{{ nbFait }} / {{ nbTotal }} fait</span>
       </div>
     </div>
@@ -151,6 +153,15 @@ import { api } from '../services/api';
 // ── Date ─────────────────────────────────────────────────────────────────────
 const aujourd_hui = new Date().toISOString().slice(0, 10);
 const dateSelectionnee = ref(aujourd_hui);
+
+function adjustDate(delta) {
+  const d = new Date(dateSelectionnee.value + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  dateSelectionnee.value = d.toISOString().slice(0, 10);
+  charger();
+}
+function prevDay() { adjustDate(-1); }
+function nextDay() { adjustDate(1); }
 
 const dateAffichee = computed(() =>
   new Date(dateSelectionnee.value + 'T12:00:00').toLocaleDateString('fr-FR', {
