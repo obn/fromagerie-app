@@ -401,7 +401,7 @@ tr.unsure:not(.done):hover td { background: #fff5e0; }
 .field::placeholder { color: #a89b7a; font-weight: 500; }
 .field:hover { border-color: #2f6f4f; }
 .field:focus { outline: none; border-color: #2f6f4f; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
-.field-dlc { width: 130px; }
+.field-dlc { width: 120px; max-width: 120px; }
 .field-lot { width: 60px; }
 
 .footer-note { margin: 18px 0 0; font-size: 0.78rem; color: #7a8898; }
