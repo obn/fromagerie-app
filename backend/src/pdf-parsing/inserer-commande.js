@@ -129,7 +129,10 @@ async function insererCommande(commande, options = {}) {
 
   // ── Résolution du client ──────────────────────────────────────────────────
   const client = await knex('clients')
-    .whereRaw('LOWER(nom) = ?', [commande.client.toLowerCase()])
+    .where(function () {
+      this.whereRaw('LOWER(nom) = ?', [commande.client.toLowerCase()])
+        .orWhereRaw('LOWER(nom_facture) = ?', [commande.client.toLowerCase()]);
+    })
     .first();
 
   if (!client) {

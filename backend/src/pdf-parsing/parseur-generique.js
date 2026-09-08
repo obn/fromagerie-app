@@ -98,24 +98,31 @@ async function resoudreClientParLibelle(texteExtrait) {
   const tokensExtrait = new Set(tokeniserClient(texteExtrait));
   if (tokensExtrait.size === 0) return texteExtrait;
 
-  const clients = await knex('clients').select('nom');
-
+  const clients = await knex('clients').select('nom', 'nom_facture');
+  
   let meilleur = null;
   let meilleurScore = 0;
-
+  
   for (const c of clients) {
-    const tokensClient = tokeniserClient(c.nom);
-    if (tokensClient.length === 0) continue;
-
-    const communs = tokensClient.filter(t => tokensExtrait.has(t));
-    if (communs.length === 0) continue;
-
-    const scoreRecouvrement = communs.length / Math.min(tokensExtrait.size, tokensClient.length);
-    if (scoreRecouvrement < 0.5) continue;
-
-    const score = scoreRecouvrement * 100 + communs.length;
+    const tokensNom = tokeniserClient(c.nom || '');
+    const tokensFacture = c.nom_facture ? tokeniserClient(c.nom_facture) : [];
+    if (tokensNom.length === 0 && tokensFacture.length === 0) continue;
+  
+    function scoreFor(tokensClient) {
+      if (!tokensClient || tokensClient.length === 0) return 0;
+      const communs = tokensClient.filter(t => tokensExtrait.has(t));
+      if (communs.length === 0) return 0;
+      const scoreRecouvrement = communs.length / Math.min(tokensExtrait.size, tokensClient.length);
+      if (scoreRecouvrement < 0.5) return 0;
+      return scoreRecouvrement * 100 + communs.length;
+    }
+  
+    const scoreNom = scoreFor(tokensNom);
+    const scoreFacture = scoreFor(tokensFacture);
+    const score = Math.max(scoreNom, scoreFacture);
     if (score > meilleurScore) {
       meilleurScore = score;
+      // Retourner toujours le nom canonique (clients.nom)
       meilleur = c.nom;
     }
   }

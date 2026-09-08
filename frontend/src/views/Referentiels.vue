@@ -20,10 +20,11 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Nom</th><th>Jour fixe livraison</th><th>Actif</th><th></th></tr></thead>
+          <thead><tr><th>Nom</th><th>Nom facture</th><th>Jour fixe livraison</th><th>Actif</th><th></th></tr></thead>
           <tbody>
             <tr v-for="c in filtres.clients" :key="c.id">
               <td><strong>{{ c.nom }}</strong></td>
+              <td>{{ c.nom_facture || '—' }}</td>
               <td>{{ c.jour_fixe_livraison || '—' }}</td>
               <td><span :class="['badge', c.actif ? 'vert' : 'gris']">{{ c.actif ? 'Actif' : 'Inactif' }}</span></td>
               <td class="act">
@@ -157,19 +158,20 @@
       <!-- Clients -->
       <template v-if="modal.type === 'clients'">
         <label>Nom <input v-model="form.nom" class="inp" /></label>
-        <label>Jour fixe livraison
-          <select v-model="form.jour_fixe_livraison" class="inp">
-            <option value="">— Aucun —</option>
-            <option value="lundi">lundi</option>
-            <option value="mardi">mardi</option>
-            <option value="mercredi">mercredi</option>
-            <option value="jeudi">jeudi</option>
-            <option value="vendredi">vendredi</option>
-            <option value="samedi">samedi</option>
-            <option value="dimanche">dimanche</option>
-          </select>
-        </label>
-        <label class="row-check"><input type="checkbox" v-model="form.actif" /> Actif</label>
+      <label>Nom facture <input v-model="form.nom_facture" class="inp" placeholder="Optionnel — si different du nom" /></label>
+      <label>Jour fixe livraison
+        <select v-model="form.jour_fixe_livraison" class="inp">
+          <option value="">— Aucun —</option>
+          <option value="lundi">lundi</option>
+          <option value="mardi">mardi</option>
+          <option value="mercredi">mercredi</option>
+          <option value="jeudi">jeudi</option>
+          <option value="vendredi">vendredi</option>
+          <option value="samedi">samedi</option>
+          <option value="dimanche">dimanche</option>
+        </select>
+      </label>
+      <label class="row-check"><input type="checkbox" v-model="form.actif" /> Actif</label>
       </template>
       <!-- Produits -->
       <template v-if="modal.type === 'produits'">
@@ -304,7 +306,7 @@ function ouvrir(type, item = null) {
 }
 
 function defaultForm(type) {
-  if (type === 'clients')  return { nom: '', jour_fixe_livraison: '', actif: true };
+  if (type === 'clients')  return { nom: '', nom_facture: '', jour_fixe_livraison: '', actif: true };
   if (type === 'produits') return { gencod: '', designation: '', unite: '', dluo_jours: null, actif: true };
   if (type === 'tarifs')   return { client_id: '', produit_id: '', pcb: null, tarif_general: null, remise_pct: null, tarif_net: null, unite_facturation: '' };
   if (type === 'codes')    return { client_id: '', code_interne: '', produit_id: '' };
