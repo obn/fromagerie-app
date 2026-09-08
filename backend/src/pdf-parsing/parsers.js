@@ -548,9 +548,9 @@ function detecterFournisseur(texte, nomFichier = '') {
   if (t.includes('distral') || f.includes('distral')) return 'distral';
   if (t.includes('scapalyon') || t.includes('bcf') || f.includes('scapalyon')) return 'scapalyon';
   if (t.includes('logifresh') || f.includes('logifresh')) return 'logifresh';
-  if (t.includes('total colis') || f.toLowerCase().includes('bon_de_commande')) return 'chez_andre';
+  if (t.includes('piècecolis') || t.includes('site de livraison')) return 'chez_andre';
   if (t.includes('biocoop') || f.includes('biocoop')) return 'biocoop';
-  if (t.includes('agence ac2t') || t.includes('ac2t.net')) return 'ac2t';
+  if (t.includes('ac2t')) return 'ac2t';
   return null;
 }
 
