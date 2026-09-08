@@ -20,7 +20,10 @@
     <div v-else class="week-grid">
       <div v-for="jour in jours" :key="jour.dateKey" :class="['day-card', { 'day-card-today': estJourActuel(jour.dateKey) }]">
         <div class="day-header">
-          <h2>{{ jour.nom }}</h2>
+          <div class="day-title-row">
+            <h2>{{ jour.nom }}</h2>
+            <button class="btn-ico btn-day-products" type="button" title="Voir produits du jour" @click="ouvrirProduitsJour(jour)">🧀</button>
+          </div>
           <span>{{ jour.dateLabel }}</span>
         </div>
 
@@ -90,6 +93,40 @@
         </table>
       </div>
     </div>
+
+    <!-- Panel produits consolidés pour la journée -->
+    <div v-if="panelProduitsOuvert" class="panel-overlay" @click.self="fermerPanelProduits">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Produits — {{ panelJourInfo?.nom || '' }} {{ panelJourInfo?.dateLabel || '' }}</h2>
+          <button class="btn-ico" type="button" @click="fermerPanelProduits" aria-label="Fermer">✕</button>
+        </div>
+
+        <div v-if="chargementProduits" class="etat">Chargement…</div>
+
+        <table v-else class="tbl-lignes">
+          <thead>
+            <tr>
+              <th>Qté</th>
+              <th>Désignation</th>
+              <th>Réf.</th>
+              <th>Unité</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(p, idx) in produitsJour" :key="p.code || p.designation || idx">
+              <td class="num">{{ p.quantite }}</td>
+              <td>{{ p.designation }}</td>
+              <td class="mono">{{ p.code || '—' }}</td>
+              <td>{{ p.unite || '—' }}</td>
+            </tr>
+            <tr v-if="!produitsJour.length">
+              <td colspan="4" class="empty-line">Aucun produit pour cette journée.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -105,6 +142,13 @@ const panelOuvert = ref(false);
 const commandeDetail = ref(null);
 const lignesDetail = ref([]);
 const chargementDetail = ref(false);
+
+// panel produits par jour
+const panelProduitsOuvert = ref(false);
+const produitsJour = ref([]);
+const chargementProduits = ref(false);
+const panelJourInfo = ref(null);
+
 // date selector (ISO yyyy-mm-dd) displayed next to nav buttons
 const dateSelectionnee = ref(formatDateISO(semaineSelectionnee.value));
 
@@ -237,6 +281,55 @@ function fermerDetailCommande() {
   chargementDetail.value = false;
 }
 
+async function ouvrirProduitsJour(jour) {
+  panelProduitsOuvert.value = true;
+  chargementProduits.value = true;
+  panelJourInfo.value = jour;
+  produitsJour.value = [];
+
+  try {
+    const commandes = (jour.commandes || []).slice();
+    const ids = Array.from(new Set(commandes.map(c => c.commande_id || c.id).filter(Boolean)));
+    if (!ids.length) {
+      produitsJour.value = [];
+      return;
+    }
+
+    const promesses = ids.map(id => api.get('/commandes/' + id).catch(() => null));
+    const details = await Promise.all(promesses);
+    const toutesLignes = [];
+    details.forEach(d => {
+      if (d && Array.isArray(d.lignes)) {
+        d.lignes.forEach(l => toutesLignes.push(l));
+      }
+    });
+
+    const map = new Map();
+    toutesLignes.forEach(l => {
+      const key = (l.code_interne && String(l.code_interne).trim()) || (l.designation_brute && String(l.designation_brute).trim()) || '__inconnu__';
+      const quant = Number(l.quantite) || 0;
+      if (!map.has(key)) {
+        map.set(key, { designation: l.designation_brute || l.reference || key, code: l.code_interne, quantite: quant, unite: l.unite || '' });
+      } else {
+        const cur = map.get(key);
+        cur.quantite = (Number(cur.quantite) || 0) + quant;
+      }
+    });
+
+    const liste = Array.from(map.values()).sort((a,b) => String(a.designation).localeCompare(String(b.designation), 'fr'));
+    produitsJour.value = liste;
+  } finally {
+    chargementProduits.value = false;
+  }
+}
+
+function fermerPanelProduits() {
+  panelProduitsOuvert.value = false;
+  produitsJour.value = [];
+  panelJourInfo.value = null;
+  chargementProduits.value = false;
+}
+
 function selectionnerDateIso(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return;
@@ -313,7 +406,10 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .day-card { background: white; border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); padding: 12px; min-height: 220px; border: 1px solid transparent; }
 .day-card-today { background: #f1f8f3; border-color: #2f6f4f; box-shadow: 0 0 0 1px rgba(47,111,79,0.12), 0 1px 6px rgba(0,0,0,0.08); }
 .day-header { border-bottom: 1px solid #f0ece0; padding-bottom: 8px; margin-bottom: 10px; }
+.day-title-row { display:flex; align-items:center; gap:8px; }
 .day-header h2 { margin: 0; font-size: 0.95rem; color: #1a2a4a; }
+.btn-day-products { font-size: 0.95rem; padding: 2px 6px; border-radius:6px; background: transparent; border: none; cursor: pointer; }
+.btn-day-products:hover { background: #f0ece0; }
 .day-header span { display: inline-block; margin-top: 4px; color: #657386; font-size: 0.75rem; }
 .delivery-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 /* slightly more right padding so inline controls stay within card on small screens */
