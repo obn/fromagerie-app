@@ -165,7 +165,7 @@ async function insererCommande(commande, options = {}) {
   const [commandeId] = await knex('commandes').insert({
     numero_commande:          commande.numeroCommande,
     client_id:                client.id,
-    date_commande:            commande.dateCommande       || null,
+    date_commande:            commande.dateCommande       || options.dateReceptionMail || null,
     date_livraison:           dateLivraisonCalculee        || null,
     date_livraison_pdf_brute: commande.dateLivraison       || null, // conservée pour trace/audit
     date_reception_mail:      dateReceptionMail            || null,
