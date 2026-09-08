@@ -696,6 +696,12 @@ async function parserChezAndre(texte) {
     }
     if (j >= zone.length) break; // format inattendu — on arrete le scan
 
+    // ligneNum1 (zone[j]) = PCB + Stock colles (ex: "60" -> PCB=6, Stock=0)
+    // Heuristique : le dernier chiffre = Stock, le reste = PCB — valable tant
+    // que Stock reste < 10 (cas observes jusqu'ici, comme pour Colis ci-dessous).
+    const ligneNum1 = zone[j];
+    const pcb = ligneNum1 && ligneNum1.length > 1 ? parseInt(ligneNum1.slice(0, -1), 10) : null;
+
     const ligneNum2 = zone[j + 1]; // Piece + Colis colles
     const colis = ligneNum2 ? parseInt(ligneNum2.slice(-1), 10) : null;
 
@@ -712,6 +718,7 @@ async function parserChezAndre(texte) {
         designationBrute: designation,
         quantite: colis,
         unite: 'colis',
+        pcb,
         certitude: 'a_verifier', // parsing recent, prudence par defaut
         ligneBrute: `${plu}${pluFrn || ''} ${designation}`,
       });
