@@ -476,7 +476,7 @@ tr:hover { background: #faf8f2; }
 .panel-head h2 { margin: 0; font-size: 1rem; color: #1a2a4a; }
 .tbl-lignes { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .tbl-lignes th { padding: 8px 14px; text-align: left; font-size: 0.71rem; text-transform: uppercase; color: #7a8898; border-bottom: 2px solid #e8e3d5; }
-.tbl-lignes td { padding: 9px 14px; border-bottom: 1px solid #f0ece0; }
+.tbl-lignes td { padding: 9px 14px; border-bottom: 1px solid #f0ece0; vertical-align: middle; }
 label { display: flex; flex-direction: column; gap: 5px; font-size: 0.85rem; font-weight: 600; color: #3a4a5a; }
 .inp { padding: 8px 10px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.875rem; width: 100%; box-sizing: border-box; }
 .inp:focus { outline: none; border-color: #2f6f4f; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }

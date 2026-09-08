@@ -38,6 +38,7 @@
             N° {{ commande.numero_commande }}
             <template v-if="commande.date_commande"> · Cdé le {{ fmtDate(commande.date_commande) }}</template>
             · Livr. le {{ fmtDate(commande.date_livraison) }}
+            <template v-if="commande.nom_fichier_pdf"> · Fichier : {{ commande.nom_fichier_pdf }}</template>
           </span>
         </div>
 
