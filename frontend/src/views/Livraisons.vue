@@ -10,6 +10,7 @@
         <button class="btn-nav" @click="semainePrecedente" aria-label="Semaine précédente">◀</button>
         <input type="date" class="inp" v-model="dateSelectionnee" @change="selectionnerDateIso($event.target.value)" aria-label="Sélectionner une date" />
         <button class="btn btn-current" :disabled="estSemaineCourante" @click="retourVersSemaineCourante" aria-label="Semaine courante">Aujourd'hui</button>
+        <button class="btn-ico btn-week-products" type="button" title="Produits semaine" @click="ouvrirProduitsSemaine">🧀</button>
         <span class="week-range">{{ libellePeriode }}</span>
         <button class="btn-nav" @click="semaineSuivante" aria-label="Semaine suivante">▶</button>
       </div>
@@ -127,6 +128,40 @@
         </table>
       </div>
     </div>
+
+    <!-- Panel produits consolidés pour la SEMAINE -->
+    <div v-if="panelProduitsSemaineOuvert" class="panel-overlay" @click.self="fermerPanelProduitsSemaine">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Produits — Semaine : {{ libellePeriode }}</h2>
+          <button class="btn-ico" type="button" @click="fermerPanelProduitsSemaine" aria-label="Fermer">✕</button>
+        </div>
+
+        <div v-if="chargementProduitsSemaine" class="etat">Chargement…</div>
+
+        <table v-else class="tbl-lignes">
+          <thead>
+            <tr>
+              <th>Qté</th>
+              <th>Désignation</th>
+              <th>Réf.</th>
+              <th>Unité</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(p, idx) in produitsSemaine" :key="p.code || p.designation || idx">
+              <td class="num">{{ p.quantite }}</td>
+              <td>{{ p.designation }}</td>
+              <td class="mono">{{ p.code || '—' }}</td>
+              <td>{{ p.unite || '—' }}</td>
+            </tr>
+            <tr v-if="!produitsSemaine.length">
+              <td colspan="4" class="empty-line">Aucun produit pour cette semaine.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -148,6 +183,11 @@ const panelProduitsOuvert = ref(false);
 const produitsJour = ref([]);
 const chargementProduits = ref(false);
 const panelJourInfo = ref(null);
+
+// panel produits semaine
+const panelProduitsSemaineOuvert = ref(false);
+const produitsSemaine = ref([]);
+const chargementProduitsSemaine = ref(false);
 
 // date selector (ISO yyyy-mm-dd) displayed next to nav buttons
 const dateSelectionnee = ref(formatDateISO(semaineSelectionnee.value));
@@ -330,6 +370,51 @@ function fermerPanelProduits() {
   chargementProduits.value = false;
 }
 
+async function ouvrirProduitsSemaine() {
+  panelProduitsSemaineOuvert.value = true;
+  chargementProduitsSemaine.value = true;
+  produitsSemaine.value = [];
+
+  try {
+    // Collecte de toutes les commandes présentes dans la semaine affichée
+    const toutesCommandes = jours.value.flatMap(j => (j.commandes || []));
+    const ids = Array.from(new Set(toutesCommandes.map(c => c.commande_id || c.id).filter(Boolean)));
+    if (!ids.length) { produitsSemaine.value = []; return; }
+
+    const promesses = ids.map(id => api.get('/commandes/' + id).catch(() => null));
+    const details = await Promise.all(promesses);
+    const toutesLignes = [];
+    details.forEach(d => {
+      if (d && Array.isArray(d.lignes)) {
+        d.lignes.forEach(l => toutesLignes.push(l));
+      }
+    });
+
+    const map = new Map();
+    toutesLignes.forEach(l => {
+      const key = (l.code_interne && String(l.code_interne).trim()) || (l.designation_brute && String(l.designation_brute).trim()) || '__inconnu__';
+      const quant = Number(l.quantite) || 0;
+      if (!map.has(key)) {
+        map.set(key, { designation: l.designation_brute || l.reference || key, code: l.code_interne, quantite: quant, unite: l.unite || '' });
+      } else {
+        const cur = map.get(key);
+        cur.quantite = (Number(cur.quantite) || 0) + quant;
+      }
+    });
+
+    const liste = Array.from(map.values()).sort((a,b) => String(a.designation).localeCompare(String(b.designation), 'fr'));
+    produitsSemaine.value = liste;
+  } finally {
+    chargementProduitsSemaine.value = false;
+  }
+}
+
+function fermerPanelProduitsSemaine() {
+  panelProduitsSemaineOuvert.value = false;
+  produitsSemaine.value = [];
+  chargementProduitsSemaine.value = false;
+}
+
 function selectionnerDateIso(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return;
@@ -408,8 +493,8 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .day-header { border-bottom: 1px solid #f0ece0; padding-bottom: 8px; margin-bottom: 10px; }
 .day-title-row { display:flex; align-items:center; gap:8px; }
 .day-header h2 { margin: 0; font-size: 0.95rem; color: #1a2a4a; }
-.btn-day-products { font-size: 0.95rem; padding: 2px 6px; border-radius:6px; background: transparent; border: none; cursor: pointer; }
-.btn-day-products:hover { background: #f0ece0; }
+.btn-day-products, .btn-week-products { font-size: 0.95rem; padding: 2px 6px; border-radius:6px; background: transparent; border: none; cursor: pointer; }
+.btn-day-products:hover, .btn-week-products:hover { background: #f0ece0; }
 .day-header span { display: inline-block; margin-top: 4px; color: #657386; font-size: 0.75rem; }
 .delivery-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 /* slightly more right padding so inline controls stay within card on small screens */
