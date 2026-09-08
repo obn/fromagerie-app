@@ -287,6 +287,85 @@ function convertirDate(dateStr) {
   const [, j, mo, a] = m;
   return `${a}-${mo}-${j}`;
 }
+// ── BIOCOOP ──────────────────────────────────────────────────────────────────
+// Format bon de commande PDF Biocoop. Le "PCB" pour ce fournisseur correspond
+// a la colonne "Cde Colis" du document.
+//
+// Texte pdf-parse : chaque ligne produit est collee sans separateur, mais la
+// colonne "Cde Colis" a TOUJOURS 3 decimales (ex: "2,000"), ce qui la
+// distingue nettement des 3 autres montants adjacents (Prix Unit., Tva,
+// Total H.T.) qui n'ont que 2 decimales — ancre fiable pour le decoupage.
+//
+// Pattern reel observe :
+//   GROS ROMANS LOCAL11,042,0005,5022,08FGRPC
+//   1,000
+// -> designation="GROS ROMANS LOCAL", prix_unit=11,04, cde_colis(PCB)=2,000,
+//    tva=5,50, total_ht=22,08 (verification : 11,04 x 2 = 22,08 ✓)
+//
+// La reference produit qui suit (ex: "FGRPC", parfois un code numerique,
+// parfois la designation dupliquee) n'est pas fiable a extraire — laissee
+// vide, resolue plus tard par rapprochement de libelle si besoin.
+async function parserBiocoop(texte) {
+  const { resoudreClientParLibelle } = require('./parseur-generique');
+
+  // N° commande : nombre isole juste apres notre propre adresse (fixe, connue)
+  const mCmd = texte.match(/PLANTAY\s*\n(\d+)/i);
+  const numeroCommande = mCmd ? mCmd[1] : 'INCONNU';
+
+  const mDateLiv = texte.match(/Livraison\s+prévu\s+le\s+(\d{2}\/\d{2}\/\d{4})/i);
+  const mDateCrea = texte.match(/Date\s+création\s*:\s*(\d{2}\/\d{2}\/\d{4})/i);
+
+  // Client dynamique : plusieurs magasins Biocoop possibles (comme Chez Andre)
+  const mClient = texte.match(/(BIOCOOP[^\n]*)/i);
+  const texteClientBrut = mClient?.[1]?.trim();
+  const client = texteClientBrut ? await resoudreClientParLibelle(texteClientBrut) : null;
+
+  // Lignes produit : designation + prix_unit(2 dec) + cde_colis(3 dec, PCB) +
+  // tva(2 dec) + total_ht(2 dec)
+  const regLigne = /([A-ZÀ-Ÿ][A-ZÀ-Ÿ0-9\s*\.\-]+?)(\d+,\d{2})(\d+,\d{3})(\d+,\d{2})(\d+,\d{2})/g;
+
+  const lignes = [];
+  let m;
+  while ((m = regLigne.exec(texte)) !== null) {
+    const designation = m[1].trim();
+    const pcb = parseQte(m[3]);
+
+    if (!designation) continue;
+
+    lignes.push({
+      codeInterne: null, // reference peu fiable dans ce format, non extraite
+      gencod: null,
+      designationBrute: designation,
+      // quantite=1 (neutre) car Cde Colis va dans pcb : evite de compter en
+      // double dans la formule "Qte totale = Qte x PCB" utilisee ailleurs.
+      quantite: 1,
+      unite: 'colis',
+      pcb,
+      certitude: 'a_verifier',
+      ligneBrute: m[0],
+    });
+  }
+
+  return {
+    client,
+    numeroCommande,
+    dateCommande: mDateCrea ? convertirDate(mDateCrea[1]) : null,
+    dateLivraison: mDateLiv ? convertirDate(mDateLiv[1]) : null,
+    lignes,
+  };
+}
+
+function parseQte(s) {
+  const n = parseFloat(String(s).replace(',', '.'));
+  return isNaN(n) ? null : n;
+}
+
+function convertirDate(dateStr) {
+  const m = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!m) return null;
+  const [, j, mo, a] = m;
+  return `${a}-${mo}-${j}`;
+}
 
 async function parserChezAndre(texte) {
   const { resoudreClientParLibelle } = require('./parseur-generique');
@@ -376,6 +455,7 @@ function detecterFournisseur(texte, nomFichier = '') {
   if (t.includes('scapalyon') || t.includes('bcf') || f.includes('scapalyon')) return 'scapalyon';
   if (t.includes('logifresh') || f.includes('logifresh')) return 'logifresh';
   if (t.includes('total colis') || f.toLowerCase().includes('bon_de_commande')) return 'chez_andre';
+  if (t.includes('biocoop') || f.includes('biocoop')) return 'biocoop';
   return null;
 }
 
@@ -385,6 +465,7 @@ async function parserPdf(texte, nomFichier = '') {
   if (fournisseur === 'scapalyon')  return parserScapalyon(texte);
   if (fournisseur === 'logifresh')  return parserLogifresh(texte);
   if (fournisseur === 'chez_andre') return await parserChezAndre(texte);
+  if (fournisseur === 'biocoop')    return await parserBiocoop(texte);
 
 
   // Fournisseur inconnu — retourner les lignes brutes avec certitude nulle
@@ -405,4 +486,4 @@ async function parserPdf(texte, nomFichier = '') {
   };
 }
 
-module.exports = { parserPdf, parserDistral, parserScapalyon, parserLogifresh, parserChezAndre, detecterFournisseur, parseDateFr };
+module.exports = { parserPdf, parserDistral, parserScapalyon, parserLogifresh, parserChezAndre, detecterFournisseur, parseDateFr, parserBiocoop };
