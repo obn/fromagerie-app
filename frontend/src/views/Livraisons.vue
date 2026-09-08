@@ -75,6 +75,8 @@
               <th>Désignation</th>
               <th>PCB</th>
               <th>Qté</th>
+              <th>DLC</th>
+              <th>N° lot</th>
             </tr>
           </thead>
           <tbody>
@@ -82,9 +84,15 @@
               <td>{{ ligne.designation_brute }}</td>
               <td class="mono">{{ ligne.pcb || '—' }}</td>
               <td class="num">{{ ligne.quantite }}</td>
+              <td>
+                <input type="date" class="field field-dlc" :value="(ligne.dlc || '').slice(0,10)" @change="majLigneDlc(ligne, $event.target.value)" />
+              </td>
+              <td>
+                <input type="text" class="field" :value="ligne.numero_lot || ''" @change="majLigneLot(ligne, $event.target.value)" />
+              </td>
             </tr>
             <tr v-if="!lignesDetail.length">
-              <td colspan="3" class="empty-line">Aucune ligne pour cette commande.</td>
+              <td colspan="5" class="empty-line">Aucune ligne pour cette commande.</td>
             </tr>
           </tbody>
         </table>
@@ -315,6 +323,28 @@ function fermerDetailCommande() {
   commandeDetail.value = null;
   lignesDetail.value = [];
   chargementDetail.value = false;
+}
+
+async function majLigneDlc(ligne, valeur) {
+  const cid = commandeDetail.value?.id;
+  if (!cid || !ligne?.id) return;
+  try {
+    await api.patch('/commandes/' + cid + '/lignes/' + ligne.id, { dlc: valeur || null });
+    ligne.dlc = valeur || null;
+  } catch (e) {
+    console.error('Échec sauvegarde DLC', e);
+  }
+}
+
+async function majLigneLot(ligne, valeur) {
+  const cid = commandeDetail.value?.id;
+  if (!cid || !ligne?.id) return;
+  try {
+    await api.patch('/commandes/' + cid + '/lignes/' + ligne.id, { numero_lot: valeur || null });
+    ligne.numero_lot = valeur || null;
+  } catch (e) {
+    console.error('Échec sauvegarde N° lot', e);
+  }
 }
 
 async function ouvrirProduitsJour(jour) {

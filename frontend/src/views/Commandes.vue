@@ -58,12 +58,18 @@
         </div>
         <div v-if="panel.chargement" class="etat">Chargement…</div>
         <table v-else class="tbl-lignes">
-          <thead><tr><th>Désignation</th><th>PCB</th><th>Qté</th></tr></thead>
+          <thead><tr><th>Désignation</th><th>PCB</th><th>Qté</th><th>DLC</th><th>N° lot</th></tr></thead>
           <tbody>
             <tr v-for="l in panel.lignes" :key="l.id">
               <td>{{ l.designation_brute }}</td>
               <td class="mono">{{ l.pcb || '—' }}</td>
               <td class="num">{{ l.quantite }}</td>
+              <td>
+                <input type="date" class="field field-dlc" :value="(l.dlc || '').slice(0,10)" @change="majLigneDlc(l, $event.target.value)" />
+              </td>
+              <td>
+                <input type="text" class="field" :value="l.numero_lot || ''" @change="majLigneLot(l, $event.target.value)" />
+              </td>
             </tr>
           </tbody>
         </table>
@@ -134,6 +140,27 @@ const modal = reactive({ visible: false, item: null });
 const form = ref({});
 const suppr = reactive({ visible: false, item: null });
 const panel = reactive({ visible: false, commande: null, lignes: [], chargement: false });
+
+async function majLigneDlc(ligne, valeur) {
+  if (!panel.commande?.id || !ligne?.id) return;
+  try {
+    await api.patch('/commandes/' + panel.commande.id + '/lignes/' + ligne.id, { dlc: valeur || null });
+    // Mise à jour locale
+    ligne.dlc = valeur || null;
+  } catch (e) {
+    console.error('Échec sauvegarde DLC', e);
+  }
+}
+
+async function majLigneLot(ligne, valeur) {
+  if (!panel.commande?.id || !ligne?.id) return;
+  try {
+    await api.patch('/commandes/' + panel.commande.id + '/lignes/' + ligne.id, { numero_lot: valeur || null });
+    ligne.numero_lot = valeur || null;
+  } catch (e) {
+    console.error('Échec sauvegarde N° lot', e);
+  }
+}
 const modalLigne = reactive({ visible: false, item: null });
 const formLigne = ref({});
 
