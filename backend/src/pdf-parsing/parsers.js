@@ -657,6 +657,122 @@ function convertirDate(dateStr) {
 
 module.exports = { parserProvidis };
 
+// ── LE RELAIS LOCAL ─────────────────────────────────────────────────────────
+// Format bon de commande PDF "Le Relais Local" (fournisseur ABBDO). Tableau
+// dense (Reference/Designation/Nature/Marque/Nb Colis/Qte/PU Brut/R%/PU Net/
+// Montant HT) dont le texte lineaire (pdf-parse) est fortement reordonne et
+// ambigu (colonnes numeriques imbriquees sans separateur fiable).
+//
+// Comme pour Perrier, extraction par POSITION X REELLE (pdfjs-dist) plutot
+// que par regex sur texte lineaire. Particularite ici : ni le PDF ni le texte
+// n'affichent de colonne "PCB" directement — on la CALCULE a partir de deux
+// colonnes distinctes et fiables : Qte (total unites) / Nb Colis (quantite
+// commandee en colis) = PCB (verifie exact sur les 11 lignes du cas reel).
+//
+// Positions X reperees empiriquement (stables, gabarit fixe) :
+//   Reference (6 chiffres)  : x < 40
+//   Designation              : x 70-250
+//   Nb Colis                 : x ≈ 356
+//   Qte                      : x ≈ 387-389
+async function parserRelaisLocal(buffer) {
+  const pdfParse = require('pdf-parse');
+  const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+  const { resoudreClientParLibelle } = require('./parseur-generique');
+
+  // ── En-tete : via pdf-parse (texte lineaire, propre pour ces champs) ──────
+  const dataTexte = await pdfParse(buffer);
+  const texte = dataTexte.text;
+
+  const mCmd = texte.match(/Commande N°\s*(\S+)/i);
+  const numeroCommande = mCmd ? mCmd[1] : 'INCONNU';
+
+  const mDateCmd = texte.match(/(\d{2}\/\d{2}\/\d{4})\s*\nABBDO/);
+  const mDateLiv = texte.match(/(\d{2}\/\d{2}\/\d{4})\s*\nDate Livraison Prévue/i);
+
+  const mClient = texte.match(/\n((?:LE RELAIS LOCAL|[A-ZÀ-Ÿ][A-ZÀ-Ÿ\s]+))\nV\/Référence/i);
+  const texteClientBrut = mClient?.[1]?.trim();
+  const client = texteClientBrut ? await resoudreClientParLibelle(texteClientBrut) : null;
+
+  // ── Lignes produit : via pdfjs-dist (positions X reelles) ─────────────────
+  const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+  const page = await doc.getPage(1);
+  const content = await page.getTextContent();
+
+  const items = content.items
+    .map(it => ({ x: Math.round(it.transform[4]), y: Math.round(it.transform[5]), texte: it.str }))
+    .filter(it => it.texte.trim());
+
+  const lignesParY = {};
+  for (const it of items) {
+    const yKey = Math.round(it.y / 2) * 2;
+    lignesParY[yKey] = lignesParY[yKey] || [];
+    lignesParY[yKey].push(it);
+  }
+  const ys = Object.keys(lignesParY).map(Number).sort((a, b) => b - a);
+
+  const pivots = [];
+  for (const y of ys) {
+    const mots = lignesParY[y];
+    const refItem = mots.find(m => /^\d{6}$/.test(m.texte) && m.x < 40);
+    if (refItem) pivots.push({ y, reference: refItem.texte });
+  }
+
+  const lignes = [];
+  for (let i = 0; i < pivots.length; i++) {
+    const p = pivots[i];
+    const yMax = pivots[i - 1] ? (p.y + pivots[i - 1].y) / 2 : p.y + 15;
+    const yMin = pivots[i + 1] ? (p.y + pivots[i + 1].y) / 2 : p.y - 15;
+
+    const motsFenetre = [];
+    for (const y of ys) {
+      if (y >= yMax) continue;
+      if (y <= yMin) break;
+      motsFenetre.push(...lignesParY[y]);
+    }
+
+    const fragmentsDesign = motsFenetre.filter(m => m.x >= 70 && m.x < 250).sort((a, b) => a.x - b.x);
+    const designation = fragmentsDesign.map(m => m.texte).join(' ').replace(/\s+/g, ' ').trim();
+
+    const trouve = (xCible, tolerance = 6) => motsFenetre.find(m => Math.abs(m.x - xCible) <= tolerance)?.texte;
+    const nbColisTexte = trouve(356);
+    const qteTexte = trouve(387) || trouve(389);
+
+    const nbColis = nbColisTexte ? parseInt(nbColisTexte, 10) : null;
+    const qte = qteTexte ? parseInt(qteTexte, 10) : null;
+    const pcb = (nbColis && qte) ? Math.round(qte / nbColis) : null;
+
+    if (!designation) continue;
+
+    lignes.push({
+      codeInterne: p.reference,
+      gencod: null,
+      designationBrute: designation,
+      quantite: nbColis,
+      unite: 'colis',
+      pcb,
+      certitude: 'haute', // extraction par coordonnees, fiable
+      ligneBrute: `${p.reference} | ${designation} | colis:${nbColis} | qte:${qte} | pcb:${pcb}`,
+    });
+  }
+
+  return {
+    client,
+    numeroCommande,
+    dateCommande: mDateCmd ? convertirDate(mDateCmd[1]) : null,
+    dateLivraison: mDateLiv ? convertirDate(mDateLiv[1]) : null,
+    lignes,
+  };
+}
+
+function convertirDate(dateStr) {
+  const m = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!m) return null;
+  const [, j, mo, a] = m;
+  return `${a}-${mo}-${j}`;
+}
+
+module.exports = { parserRelaisLocal };
+
 async function parserChezAndre(texte) {
   const { resoudreClientParLibelle } = require('./parseur-generique');
 
@@ -755,6 +871,7 @@ function detecterFournisseur(texte, nomFichier = '') {
   if (t.includes('biocoop') || f.includes('biocoop')) return 'biocoop';
   if (t.includes('perrier')) return 'perrier';
   if (t.includes('providis')) return 'providis';
+  if (t.includes('lerelaislocal') || t.includes('le relais local')) return 'relais_local';
   if (t.includes('ac2t')) return 'ac2t';
   return null;
 }
@@ -769,6 +886,7 @@ async function parserPdf(texte, nomFichier = '', buffer = null) {
   if (fournisseur === 'ac2t')       return await parserAC2T(texte);
   if (fournisseur === 'perrier') return await parserPerrier(buffer);
   if (fournisseur === 'providis') return await parserProvidis(texte);
+  if (fournisseur === 'relais_local') return await parserRelaisLocal(buffer);
 
   // Fournisseur inconnu — retourner les lignes brutes avec certitude nulle
   console.warn(`[parser] Fournisseur non identifié pour "${nomFichier}" — mode brut`);
@@ -788,4 +906,4 @@ async function parserPdf(texte, nomFichier = '', buffer = null) {
   };
 }
 
-module.exports = { parserPdf, parserDistral, parserScapalyon, parserLogifresh, parserChezAndre, detecterFournisseur, parseDateFr, parserBiocoop, parserAC2T,parserPerrier,parserProvidis};
+module.exports = { parserPdf, parserDistral, parserScapalyon, parserLogifresh, parserChezAndre, detecterFournisseur, parseDateFr, parserBiocoop, parserAC2T,parserPerrier,parserProvidis,parserRelaisLocal};
