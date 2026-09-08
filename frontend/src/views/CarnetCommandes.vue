@@ -90,19 +90,6 @@
                       @blur="editId = null"
                     />
 
-                    <span
-                      v-if="(ligne.code_interne || ligne.gencod) && editRefId !== ligne.id"
-                      class="ref-tag"
-                      @click="editRefId = ligne.id"
-                    >[{{ etats[ligne.id]?.ref ?? (ligne.code_interne || ligne.gencod) }}]</span>
-                    <input
-                      v-else-if="ligne.code_interne || ligne.gencod"
-                      class="ref-input"
-                      :value="etats[ligne.id]?.ref ?? (ligne.code_interne || ligne.gencod)"
-                      @input="majEtat(ligne.id, 'ref', $event.target.value)"
-                      @blur="editRefId = null"
-                    />
-
                     <span v-if="ligne.tarif_net" class="prix-hint">
                       {{ Number(ligne.tarif_net).toFixed(2) }} € / {{ ligne.unite_tarif }}
                     </span>
@@ -112,11 +99,11 @@
 
               <!-- PCB -->
               <td>
-                <input type="number" class="field" :value="(etats[ligne.id]?.pcb !== undefined && etats[ligne.id]?.pcb !== null) ? etats[ligne.id].pcb : (ligne.pcb !== null && ligne.pcb !== undefined ? ligne.pcb : '')" @change="majLignePcb(ligne, $event.target.value)" />
+                <input type="number" class="field pcb-input" maxlength="5" :value="(etats[ligne.id]?.pcb !== undefined && etats[ligne.id]?.pcb !== null) ? etats[ligne.id].pcb : (ligne.pcb !== null && ligne.pcb !== undefined ? ligne.pcb : '')" @change="majLignePcb(ligne, $event.target.value)" />
               </td>
 
               <!-- Qté -->
-              <td class="num">{{ ligne.quantite }}<template v-if="ligne.unite"> {{ ligne.unite }}</template></td>
+              <td class="num">{{ ligne.quantite }}</td>
 
               <!-- DLC -->
               <td>
@@ -194,7 +181,6 @@ const commandes = ref([]);
 const chargement = ref(true);
 const etats = reactive({});          // { [ligneId]: { fait, dlc, lot, produit, ref } }
 const editId = ref(null);            // id de la ligne dont la designation est en edition
-const editRefId = ref(null);         // id de la ligne dont la reference est en edition
 const statutMsg = ref('Chargement de l\'historique…');
 const statutClass = ref('');
 
@@ -352,13 +338,26 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 
 /* Meme pattern exact que Commandes.vue / Referentiels.vue : une vraie table HTML
    dans un conteneur overflow-x:auto — aucun bug de scroll constate sur ce pattern. */
-.client-block { background: white; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); margin-bottom: 16px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.client-block { background: white; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); margin-bottom: 16px; overflow: visible; }
 .client-name {
   font-weight: 700; color: #1a2a4a; font-size: 1rem;
   padding: 10px 14px; background: #f5f2e8;
   border-bottom: 2px solid #e8e3d5; border-radius: 10px 10px 0 0;
   display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px;
 }
+
+.client-block table { width: 100%; border-collapse: collapse; min-width: 0; }
+.client-block th, .client-block td { padding: 8px 10px; vertical-align: middle; text-align: left; }
+.client-block .th-check { width: 42px; }
+/* Columns: 1=check, 2=designation (flex), 3=PCB, 4=Qté, 5=DLC, 6=N° lot */
+.client-block th:nth-child(3), .client-block td:nth-child(3) { width: 5ch; max-width: 60px; }
+.client-block th:nth-child(4), .client-block td:nth-child(4) { width: 5ch; max-width: 60px; text-align: right; }
+.client-block th:nth-child(5), .client-block td:nth-child(5) { width: 11ch; max-width: 110px; }
+.client-block th:nth-child(6), .client-block td:nth-child(6) { width: 12ch; max-width: 140px; }
+.client-block td, .client-block th { word-break: break-word; }
+.design-text, .prodline { white-space: normal; }
+.pcb-input { width: 5ch; min-width: 48px; max-width: 60px; padding: 4px 6px; }
+
 .commande-infos { font-size: 0.75rem; font-weight: 500; color: #7a8898; }
 
 table { width: 100%; min-width: 480px; border-collapse: collapse; font-size: 0.9rem; }
@@ -390,10 +389,6 @@ tr.unsure:not(.done):hover td { background: #fff5e0; }
 .product-input.unsure { background: #fff3a0; border-color: #d8c400; }
 .product-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
 
-.ref-tag { font-size: 0.8rem; color: #2f6f4f; font-weight: 700; cursor: text; white-space: nowrap; background: #eef6ec; padding: 1px 6px; border-radius: 4px; margin-right: 6px; }
-.ref-tag:hover { text-decoration: underline dotted; }
-.ref-input { font-size: 0.8rem; border: 1px solid #2f6f4f; background: white; padding: 2px 6px; color: #2f6f4f; width: 90px; border-radius: 4px; margin-right: 6px; vertical-align: middle; }
-.ref-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
 
 .prix-hint { font-size: 0.75rem; color: #2f6f4f; font-weight: 600; white-space: nowrap; }
 .unsure-label { background: #fff3a0; padding: 4px 8px; border-radius: 4px; font-size: 0.82rem; font-weight: 600; color: #7a6000; white-space: pre-wrap; box-shadow: inset 0 0 0 1px #d8c400; }
