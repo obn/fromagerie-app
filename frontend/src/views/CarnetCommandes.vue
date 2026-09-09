@@ -109,7 +109,7 @@
                     autocomplete="off"
                     maxlength="20"
                     :value="etats[ligne.id]?.refZacher ?? ligne.ref_zacher ?? ''"
-                    @change="majLigneRefZacher(ligne, $event.target.value)"
+                    @input="majEtat(ligne.id, 'refZacher', $event.target.value)"
                   />
                   <button
                     type="button"
