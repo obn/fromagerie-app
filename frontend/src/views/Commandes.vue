@@ -85,10 +85,10 @@
             <tr v-for="l in panel.lignes" :key="l.id">
               <td>{{ l.designation_brute }}</td>
               <td>
-                <input type="text" class="field field-ref" :value="l.ref_zacher || ''" @change="majLigneRefZacher(l, $event.target.value)" />
+                <input type="text" class="field input-ref-zacher" maxlength="5" :value="l.ref_zacher || ''" @change="majLigneRefZacher(l, $event.target.value)" />
               </td>
               <td>
-                <input type="number" class="field" :value="l.pcb !== null && l.pcb !== undefined ? l.pcb : ''" @change="majLignePcb(l, $event.target.value)" />
+                <input type="number" class="field input-pcb" maxlength="3" :value="l.pcb !== null && l.pcb !== undefined ? l.pcb : ''" @change="majLignePcb(l, $event.target.value)" />
               </td>
               <td class="num">{{ l.quantite }}</td>
               <td>
@@ -100,7 +100,7 @@
                 </template>
               </td>
               <td>
-                <input type="text" class="field" :value="l.numero_lot || ''" @change="majLigneLot(l, $event.target.value)" />
+                <input type="text" class="field input-num-lot" maxlength="4" :value="l.numero_lot || ''" @change="majLigneLot(l, $event.target.value)" />
               </td>
             </tr>
           </tbody>
@@ -507,7 +507,9 @@ tr:hover { background: #faf8f2; }
 label { display: flex; flex-direction: column; gap: 5px; font-size: 0.85rem; font-weight: 600; color: #3a4a5a; }
 .inp { padding: 8px 10px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.875rem; width: 100%; box-sizing: border-box; }
 .inp:focus { outline: none; border-color: #2f6f4f; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
-.field-ref { width: 120px; min-width: 90px; text-align: left; }
+.input-ref-zacher { width: 6ch; min-width: 6ch; text-align: left; }
+.input-pcb { width: 4ch; min-width: 4ch; text-align: left; }
+.input-num-lot { width: 5ch; min-width: 5ch; text-align: left; }
 
 .tbl-lignes .total-row td { font-weight: 700; background: #f5f5f5; border-top: 2px solid #e8e3d5; }
 </style>
