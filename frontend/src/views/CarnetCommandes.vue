@@ -471,8 +471,18 @@ async function confirmerProduitSelectionne() {
  if (!ligne) return;
 
  const refZacher = (produitLookup.selectedRef ?? '').trim() || null;
+ let commandeId = null;
+ for (const c of commandes.value) {
+   if ((c.lignes || []).some(l => l.id === ligne.id)) { commandeId = c.id; break; }
+ }
+ if (!commandeId) return;
+
  try {
+   // Mettre à jour le produit
    await api.patch(`/produits/${produitLookup.selected.id}`, { ref_zacher: refZacher });
+    
+   // Mettre à jour la ligne de commande avec la ref_zacher
+   await api.patch(`/commandes/${commandeId}/lignes/${ligne.id}`, { ref_zacher: refZacher });
 
    if (!etats[ligne.id]) etats[ligne.id] = {};
    etats[ligne.id].refZacher = refZacher || '';
