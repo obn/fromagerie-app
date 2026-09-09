@@ -37,9 +37,9 @@ router.get('/:annee/:mois/:jour', async (req, res) => {
         })
         .select(
           'lc.*',
+          'p.id as produit_id_obj',
           'p.gencod',
           'p.designation as designation_officielle',
-          'p.ref_zacher',
           't.tarif_net',
           't.tarif_general',
           't.remise_pct',

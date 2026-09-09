@@ -133,7 +133,7 @@ router.get('/:id', async (req, res) => {
       .leftJoin('tarifs_client_produit as t', function () {
         this.on('t.produit_id', '=', 'p.id').andOn('t.client_id', '=', knex.raw('?', [commande.client_id]));
       })
-      .select('lc.*', 'p.gencod', 'p.designation as designation_officielle', 'p.ref_zacher',
+      .select('lc.*', 'p.gencod', 'p.designation as designation_officielle',
               't.tarif_net', 't.tarif_general', 't.remise_pct', 't.unite_facturation as unite_tarif');
     res.json({ ...commande, lignes });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -162,8 +162,15 @@ router.post('/:id/lignes', async (req, res) => {
 
 // PATCH /api/commandes/:id/lignes/:lid
 router.patch('/:id/lignes/:lid', async (req, res) => {
-  try { await knex('lignes_commande').where({ id: req.params.lid }).update(nettoyer(req.body)); res.json({ ok: true }); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  try {
+    const updateFields = nettoyer(req.body);
+    await knex('lignes_commande').where({ id: req.params.lid }).update(updateFields);
+    res.json({ ok: true });
+  }
+  catch (e) {
+    console.error('[commandes] PATCH lignes failed', { commandeId: req.params.id, ligneId: req.params.lid, body: req.body, error: e.message });
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // DELETE /api/commandes/:id/lignes/:lid

@@ -107,72 +107,20 @@
                     class="field field-ref"
                     placeholder="Réf."
                     autocomplete="off"
+                    maxlength="20"
                     :value="etats[ligne.id]?.refZacher ?? ligne.ref_zacher ?? ''"
-                    @change="majRefZacher(ligne, $event.target.value)"
+                    @change="majLigneRefZacher(ligne, $event.target.value)"
                   />
                   <button
                     type="button"
                     class="ref-zacher-picker"
                     :class="{ 'is-filled': hasRefZacher(ligne) }"
-                    :title="hasRefZacher(ligne) ? 'Mettre à jour la référence Zacher' : 'Ajouter une référence Zacher'"
-                    @click="ouvrirRechercheProduit(ligne)"
-                    aria-label="Rechercher ou corriger la référence Zacher"
+                    :title="hasRefZacher(ligne) ? 'Référence Zacher renseignée' : 'Ajouter une référence Zacher'"
+                    aria-label="Statut référence Zacher"
+                    disabled
                   >
-                    {{ hasRefZacher(ligne) ? '✓' : '✎' }}
+                    {{ hasRefZacher(ligne) ? '✓' : '—' }}
                   </button>
-                </div>
-
-                <div
-                  v-if="produitLookup.open && produitLookup.lineId === ligne.id"
-                  class="ref-zacher-popover"
-                >
-                  <div class="popover-header">
-                    <strong>Produit</strong>
-                    <button type="button" class="popover-close" @click="fermerRechercheProduit">✕</button>
-                  </div>
-
-                  <input
-                    v-model="produitLookup.query"
-                    class="lookup-input"
-                    type="text"
-                    placeholder="Rechercher un produit..."
-                    @input="debounceRechercheProduit"
-                    autocomplete="off"
-                  />
-
-                  <div v-if="produitLookup.loading" class="lookup-status">Recherche…</div>
-
-                  <div v-else-if="!produitLookup.results.length" class="lookup-status empty">
-                    Aucun produit ne correspond.
-                  </div>
-
-                  <div v-else class="lookup-results">
-                    <button
-                      v-for="produit in produitLookup.results"
-                      :key="produit.id"
-                      type="button"
-                      class="lookup-result"
-                      @click="selectionnerProduit(produit)"
-                    >
-                      <span class="lookup-designation">{{ produit.designation }}</span>
-                      <span class="lookup-ref">{{ produit.ref_zacher || '—' }}</span>
-                    </button>
-                  </div>
-
-                  <div v-if="produitLookup.selected" class="lookup-confirm">
-                    <label class="lookup-label">Réf. Zacher pour {{ produitLookup.selected.designation }}</label>
-                    <input
-                      v-model="produitLookup.selectedRef"
-                      type="text"
-                      maxlength="20"
-                      class="lookup-input"
-                      placeholder="Saisir ou confirmer"
-                    />
-                    <div class="lookup-actions">
-                      <button type="button" class="btn-mini primary" @click="confirmerProduitSelectionne">Enregistrer</button>
-                      <button type="button" class="btn-mini" @click="produitLookup.selected = null">Annuler</button>
-                    </div>
-                  </div>
                 </div>
               </td>
 
@@ -367,18 +315,24 @@ async function sauvegarderLigne(ligneId) {
   }
 }
 
-async function majRefZacher(ligne, valeur) {
- if (!ligne?.produit_id) return;
+async function majLigneRefZacher(ligne, valeur) {
+ if (!ligne?.id) return;
+ let commandeId = null;
+ for (const c of commandes.value) {
+   if ((c.lignes || []).some(l => l.id === ligne.id)) { commandeId = c.id; break; }
+ }
+ if (!commandeId) return;
+
  const refZacher = (valeur ?? '').trim() || null;
  try {
-   await api.patch('/referentiels/produits/' + ligne.produit_id, { ref_zacher: refZacher });
+   await api.patch(`/commandes/${commandeId}/lignes/${ligne.id}`, { ref_zacher: refZacher });
    if (!etats[ligne.id]) etats[ligne.id] = {};
    etats[ligne.id].refZacher = refZacher || '';
    ligne.ref_zacher = refZacher;
    statutMsg.value = 'Réf. Zacher enregistrée ✓';
    statutClass.value = 'ok';
  } catch (e) {
-   console.error('Échec sauvegarde Réf. Zacher', e);
+   console.error('[CarnetCommandes] Échec sauvegarde ref_zacher', { ligneId: ligne.id, commandeId, refZacher, error: e });
    statutMsg.value = 'Échec d\'enregistrement — ' + (e.message || '');
    statutClass.value = 'erreur';
  }
