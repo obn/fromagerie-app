@@ -32,8 +32,21 @@ router.delete('/clients/:id', async (req, res) => {
 
 // ─── PRODUITS ────────────────────────────────────────────────────────────────
 router.get('/produits', async (req, res) => {
-  try { res.json(await knex('produits').orderBy('designation')); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  try {
+    const q = String(req.query.search || '').trim();
+    let query = knex('produits');
+
+    if (q) {
+      const like = `%${q.toLowerCase()}%`;
+      query = query.where(function () {
+        this.whereRaw('LOWER(designation) LIKE ?', [like])
+          .orWhereRaw('LOWER(ref_zacher) LIKE ?', [like])
+          .orWhereRaw('LOWER(gencod) LIKE ?', [like]);
+      });
+    }
+
+    res.json(await query.orderBy('designation'));
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 router.post('/produits', async (req, res) => {
   try {

@@ -100,15 +100,80 @@
               </td>
 
               <!-- Réf. Zacher -->
-              <td>
-                <input
-                  type="text"
-                  class="field field-ref"
-                  placeholder="Réf."
-                  autocomplete="off"
-                  :value="etats[ligne.id]?.refZacher ?? ligne.ref_zacher ?? ''"
-                  @change="majRefZacher(ligne, $event.target.value)"
-                />
+              <td class="ref-zacher-cell">
+                <div class="ref-zacher-wrap">
+                  <input
+                    type="text"
+                    class="field field-ref"
+                    placeholder="Réf."
+                    autocomplete="off"
+                    :value="etats[ligne.id]?.refZacher ?? ligne.ref_zacher ?? ''"
+                    @change="majRefZacher(ligne, $event.target.value)"
+                  />
+                  <button
+                    type="button"
+                    class="ref-zacher-picker"
+                    :class="{ 'is-filled': hasRefZacher(ligne) }"
+                    :title="hasRefZacher(ligne) ? 'Mettre à jour la référence Zacher' : 'Ajouter une référence Zacher'"
+                    @click="ouvrirRechercheProduit(ligne)"
+                    aria-label="Rechercher ou corriger la référence Zacher"
+                  >
+                    {{ hasRefZacher(ligne) ? '✓' : '✎' }}
+                  </button>
+                </div>
+
+                <div
+                  v-if="produitLookup.open && produitLookup.lineId === ligne.id"
+                  class="ref-zacher-popover"
+                >
+                  <div class="popover-header">
+                    <strong>Produit</strong>
+                    <button type="button" class="popover-close" @click="fermerRechercheProduit">✕</button>
+                  </div>
+
+                  <input
+                    v-model="produitLookup.query"
+                    class="lookup-input"
+                    type="text"
+                    placeholder="Rechercher un produit..."
+                    @input="debounceRechercheProduit"
+                    autocomplete="off"
+                  />
+
+                  <div v-if="produitLookup.loading" class="lookup-status">Recherche…</div>
+
+                  <div v-else-if="!produitLookup.results.length" class="lookup-status empty">
+                    Aucun produit ne correspond.
+                  </div>
+
+                  <div v-else class="lookup-results">
+                    <button
+                      v-for="produit in produitLookup.results"
+                      :key="produit.id"
+                      type="button"
+                      class="lookup-result"
+                      @click="selectionnerProduit(produit)"
+                    >
+                      <span class="lookup-designation">{{ produit.designation }}</span>
+                      <span class="lookup-ref">{{ produit.ref_zacher || '—' }}</span>
+                    </button>
+                  </div>
+
+                  <div v-if="produitLookup.selected" class="lookup-confirm">
+                    <label class="lookup-label">Réf. Zacher pour {{ produitLookup.selected.designation }}</label>
+                    <input
+                      v-model="produitLookup.selectedRef"
+                      type="text"
+                      maxlength="20"
+                      class="lookup-input"
+                      placeholder="Saisir ou confirmer"
+                    />
+                    <div class="lookup-actions">
+                      <button type="button" class="btn-mini primary" @click="confirmerProduitSelectionne">Enregistrer</button>
+                      <button type="button" class="btn-mini" @click="produitLookup.selected = null">Annuler</button>
+                    </div>
+                  </div>
+                </div>
               </td>
 
               <!-- PCB -->
@@ -303,20 +368,120 @@ async function sauvegarderLigne(ligneId) {
 }
 
 async function majRefZacher(ligne, valeur) {
-if (!ligne?.produit_id) return;
-const refZacher = (valeur ?? '').trim() || null;
-try {
-  await api.patch('/referentiels/produits/' + ligne.produit_id, { ref_zacher: refZacher });
-  if (!etats[ligne.id]) etats[ligne.id] = {};
-  etats[ligne.id].refZacher = refZacher || '';
-  ligne.ref_zacher = refZacher;
-  statutMsg.value = 'Réf. Zacher enregistrée ✓';
-  statutClass.value = 'ok';
-} catch (e) {
-  console.error('Échec sauvegarde Réf. Zacher', e);
-  statutMsg.value = 'Échec d\'enregistrement — ' + (e.message || '');
-  statutClass.value = 'erreur';
+ if (!ligne?.produit_id) return;
+ const refZacher = (valeur ?? '').trim() || null;
+ try {
+   await api.patch('/referentiels/produits/' + ligne.produit_id, { ref_zacher: refZacher });
+   if (!etats[ligne.id]) etats[ligne.id] = {};
+   etats[ligne.id].refZacher = refZacher || '';
+   ligne.ref_zacher = refZacher;
+   statutMsg.value = 'Réf. Zacher enregistrée ✓';
+   statutClass.value = 'ok';
+ } catch (e) {
+   console.error('Échec sauvegarde Réf. Zacher', e);
+   statutMsg.value = 'Échec d\'enregistrement — ' + (e.message || '');
+   statutClass.value = 'erreur';
+ }
 }
+
+const produitLookup = reactive({
+ open: false,
+ lineId: null,
+ query: '',
+ loading: false,
+ results: [],
+ selected: null,
+ selectedRef: '',
+});
+
+let lookupTimer = null;
+
+function hasRefZacher(ligne) {
+ const value = (etats[ligne.id]?.refZacher ?? ligne.ref_zacher ?? '').toString().trim();
+ return !!value;
+}
+
+function fermerRechercheProduit() {
+ produitLookup.open = false;
+ produitLookup.lineId = null;
+ produitLookup.query = '';
+ produitLookup.loading = false;
+ produitLookup.results = [];
+ produitLookup.selected = null;
+ produitLookup.selectedRef = '';
+ clearTimeout(lookupTimer);
+}
+
+function trouverLigneParId(ligneId) {
+ for (const commande of commandes.value) {
+   const ligne = (commande.lignes || []).find(item => item.id === ligneId);
+   if (ligne) return ligne;
+ }
+ return null;
+}
+
+async function rechercherProduitsParLibelle(ligne, search = '') {
+ const term = String(search || ligne?.designation_officielle || ligne?.designation_brute || etats[ligne.id]?.produit || '').trim();
+ if (!term) {
+   produitLookup.results = [];
+   produitLookup.loading = false;
+   return;
+ }
+
+ produitLookup.loading = true;
+ try {
+   const results = await api.get(`/referentiels/produits?search=${encodeURIComponent(term)}`);
+   produitLookup.results = (results || []).slice(0, 8);
+ } catch (e) {
+   console.error('Erreur recherche produit Zacher', e);
+   produitLookup.results = [];
+ } finally {
+   produitLookup.loading = false;
+ }
+}
+
+function debounceRechercheProduit() {
+ const ligne = trouverLigneParId(produitLookup.lineId);
+ if (!ligne) return;
+ clearTimeout(lookupTimer);
+ lookupTimer = setTimeout(() => rechercherProduitsParLibelle(ligne, produitLookup.query), 250);
+}
+
+function ouvrirRechercheProduit(ligne) {
+ const libelle = ligne?.designation_officielle || ligne?.designation_brute || etats[ligne.id]?.produit || '';
+ produitLookup.open = true;
+ produitLookup.lineId = ligne.id;
+ produitLookup.query = libelle;
+ produitLookup.selected = null;
+ produitLookup.selectedRef = '';
+ produitLookup.results = [];
+ rechercherProduitsParLibelle(ligne, libelle);
+}
+
+function selectionnerProduit(produit) {
+ produitLookup.selected = produit;
+ produitLookup.selectedRef = produit.ref_zacher || '';
+}
+
+async function confirmerProduitSelectionne() {
+ if (!produitLookup.selected) return;
+ const ligne = trouverLigneParId(produitLookup.lineId);
+ if (!ligne) return;
+
+ const refZacher = (produitLookup.selectedRef ?? '').trim() || null;
+ try {
+   await api.patch('/referentiels/produits/' + produitLookup.selected.id, { ref_zacher: refZacher });
+   if (!etats[ligne.id]) etats[ligne.id] = {};
+   etats[ligne.id].refZacher = refZacher || '';
+   ligne.ref_zacher = refZacher;
+   statutMsg.value = 'Réf. Zacher mise à jour ✓';
+   statutClass.value = 'ok';
+   fermerRechercheProduit();
+ } catch (e) {
+   console.error('Échec mise à jour produit Zacher', e);
+   statutMsg.value = 'Échec d\'enregistrement — ' + (e.message || '');
+   statutClass.value = 'erreur';
+ }
 }
 
 // ── PCB sauvegarde immédiate (comme Commandes.vue) ─────────────────────────────
@@ -451,6 +616,46 @@ tr.unsure:not(.done):hover td { background: #fff5e0; }
 .field-dlc { width: 120px; max-width: 120px; }
 .field-lot { width: 60px; }
 .field-ref { width: 110px; min-width: 90px; text-align: left; }
+.ref-zacher-cell { position: relative; }
+.ref-zacher-wrap { display: flex; align-items: center; gap: 6px; }
+.ref-zacher-picker {
+  width: 32px; height: 32px; border: 1px solid #d0cbb8; border-radius: 8px;
+  background: #f5f2e8; color: #1a2a4a; font-weight: 700; cursor: pointer;
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; padding: 0;
+}
+.ref-zacher-picker:hover { border-color: #2f6f4f; background: #edf6f1; }
+.ref-zacher-picker.is-filled { background: #eaf7ea; border-color: #8ec49a; color: #2f6f4f; }
+.ref-zacher-popover {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 20;
+  width: min(320px, 80vw); background: white; border: 1px solid #e8e3d5;
+  border-radius: 12px; box-shadow: 0 12px 28px rgba(26,42,74,0.14); padding: 10px; display: flex; flex-direction: column; gap: 8px;
+}
+.popover-header { display: flex; justify-content: space-between; align-items: center; }
+.popover-close { border: none; background: transparent; color: #7a8898; font-size: 1rem; cursor: pointer; }
+.lookup-input {
+  width: 100%; box-sizing: border-box; border: 1px solid #d0cbb8; border-radius: 6px;
+  padding: 7px 8px; font-size: 0.82rem; color: #1a2a4a; background: white;
+}
+.lookup-input:focus { outline: none; border-color: #2f6f4f; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
+.lookup-status { font-size: 0.75rem; color: #7a8898; padding: 2px 0; }
+.lookup-status.empty { color: #7a8898; }
+.lookup-results { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+.lookup-result {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%;
+  border: 1px solid #edf0eb; background: #fafaf8; border-radius: 8px; padding: 8px 10px;
+  cursor: pointer; text-align: left; color: #1a2a4a;
+}
+.lookup-result:hover { background: #eef6ec; border-color: #dfece2; }
+.lookup-designation { font-size: 0.8rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lookup-ref { font-size: 0.74rem; color: #2f6f4f; font-weight: 700; }
+.lookup-confirm { border-top: 1px solid #f0ece0; padding-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.lookup-label { font-size: 0.74rem; color: #5a6070; font-weight: 600; }
+.lookup-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.btn-mini {
+  border: 1px solid #d0cbb8; background: white; color: #1a2a4a; border-radius: 6px;
+  padding: 6px 10px; font-size: 0.76rem; font-weight: 600; cursor: pointer;
+}
+.btn-mini.primary { background: #2f6f4f; border-color: #2f6f4f; color: white; }
 .dlc-text { cursor: pointer; color: #1a2a4a; }
 
 .footer-note { margin: 18px 0 0; font-size: 0.78rem; color: #7a8898; }
