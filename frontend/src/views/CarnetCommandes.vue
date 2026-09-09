@@ -168,7 +168,6 @@
       </div>
 
       <!-- Popin recherche Zacher (rendue en dehors de la table pour éviter les problèmes de positionnement) -->
-      <div v-if="produitLookup.open" class="lookup-backdrop" @click="fermerRechercheProduit"></div>
       <div v-if="produitLookup.open" class="ref-zacher-popover">
         <div class="popover-header">
           <span style="font-weight: 600; font-size: 0.82rem;">Chercher ref. Zacher</span>
@@ -637,7 +636,8 @@ tr.unsure:not(.done):hover td { background: #fff5e0; }
 .ref-zacher-popover {
   position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000;
   width: min(340px, 90vw); background: white; border: 1px solid #e8e3d5;
-  border-radius: 12px; box-shadow: 0 12px 28px rgba(26,42,74,0.20); padding: 16px; display: flex; flex-direction: column; gap: 10px;
+  border-radius: 12px; box-shadow: 0 20px 40px rgba(26,42,74,0.25); padding: 16px; display: flex; flex-direction: column; gap: 10px;
+  pointer-events: auto;
 }
 .popover-header { display: flex; justify-content: space-between; align-items: center; }
 .popover-close { border: none; background: transparent; color: #7a8898; font-size: 1rem; cursor: pointer; }
@@ -667,9 +667,6 @@ tr.unsure:not(.done):hover td { background: #fff5e0; }
 .btn-mini.primary { background: #2f6f4f; border-color: #2f6f4f; color: white; }
 .btn-mini:hover { background: #f5f2e8; }
 .btn-mini.primary:hover { background: #1f5f3f; }
-.lookup-backdrop {
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(26,42,74,0.35); z-index: 999;
-}
 .dlc-text { cursor: pointer; color: #1a2a4a; }
 
 .footer-note { margin: 18px 0 0; font-size: 0.78rem; color: #7a8898; }
