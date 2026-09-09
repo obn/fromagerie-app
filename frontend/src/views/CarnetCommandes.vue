@@ -305,6 +305,7 @@ async function sauvegarderLigne(ligneId) {
       numero_lot:        e.lot || null,
       designation_brute: e.produit || null,
       code_interne:      e.ref || null,
+      ref_zacher:        e.refZacher || null,
       fait_le:           e.fait ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null,
     });
     statutMsg.value = 'Enregistré ✓';

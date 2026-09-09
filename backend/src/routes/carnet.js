@@ -69,6 +69,7 @@ router.post('/:annee/:mois/:jour', async (req, res) => {
           numero_lot: valeurs.lot || null,
           designation_brute: valeurs.produit,
           code_interne: valeurs.codeInterne,
+          ref_zacher: valeurs.refZacher || null,
           fait_le: valeurs.fait ? knex.fn.now() : null,
         })
     );
