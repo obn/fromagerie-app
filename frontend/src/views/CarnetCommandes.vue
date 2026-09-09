@@ -121,50 +121,6 @@
                   >
                     {{ hasRefZacher(ligne) ? '✓' : '⋯' }}
                   </button>
-                  <!-- Popin recherche Zacher -->
-                  <div v-if="produitLookup.open && produitLookup.lineId === ligne.id" class="ref-zacher-popover">
-                    <div class="popover-header">
-                      <span style="font-weight: 600; font-size: 0.82rem;">Chercher ref. Zacher</span>
-                      <button type="button" class="popover-close" @click="fermerRechercheProduit">✕</button>
-                    </div>
-                    <input
-                      type="text"
-                      class="lookup-input"
-                      placeholder="Désignation produit…"
-                      v-model="produitLookup.query"
-                      @input="debounceRechercheProduit"
-                      @keydown.enter="() => {}"
-                    />
-                    <div v-if="produitLookup.loading" class="lookup-status">Recherche…</div>
-                    <div v-else-if="!produitLookup.results.length" class="lookup-status empty">
-                      {{ produitLookup.query ? 'Aucun résultat' : 'Tapez pour chercher' }}
-                    </div>
-                    <div v-else class="lookup-results">
-                      <button
-                        v-for="produit in produitLookup.results"
-                        :key="produit.id"
-                        type="button"
-                        class="lookup-result"
-                        @click="selectionnerProduit(produit)"
-                      >
-                        <span class="lookup-designation">{{ produit.designation }}</span>
-                        <span class="lookup-ref">{{ produit.ref_zacher || '—' }}</span>
-                      </button>
-                    </div>
-                    <div v-if="produitLookup.selected" class="lookup-confirm">
-                      <div class="lookup-label">Réf. Zacher pour ce produit :</div>
-                      <input
-                        type="text"
-                        class="lookup-input"
-                        v-model="produitLookup.selectedRef"
-                        placeholder="Entrée Zacher…"
-                      />
-                      <div class="lookup-actions">
-                        <button type="button" class="btn-mini" @click="fermerRechercheProduit">Annuler</button>
-                        <button type="button" class="btn-mini primary" @click="confirmerProduitSelectionne">Confirmer</button>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </td>
 
@@ -211,7 +167,53 @@
         </table>
       </div>
 
-      <!-- FOOTER -->
+      <!-- Popin recherche Zacher (rendue en dehors de la table pour éviter les problèmes de positionnement) -->
+      <div v-if="produitLookup.open" class="lookup-backdrop" @click="fermerRechercheProduit"></div>
+      <div v-if="produitLookup.open" class="ref-zacher-popover">
+        <div class="popover-header">
+          <span style="font-weight: 600; font-size: 0.82rem;">Chercher ref. Zacher</span>
+          <button type="button" class="popover-close" @click="fermerRechercheProduit">✕</button>
+        </div>
+        <input
+          type="text"
+          class="lookup-input"
+          placeholder="Désignation produit…"
+          v-model="produitLookup.query"
+          @input="debounceRechercheProduit"
+          @keydown.enter="() => {}"
+        />
+        <div v-if="produitLookup.loading" class="lookup-status">Recherche…</div>
+        <div v-else-if="!produitLookup.results.length" class="lookup-status empty">
+          {{ produitLookup.query ? 'Aucun résultat' : 'Tapez pour chercher' }}
+        </div>
+        <div v-else class="lookup-results">
+          <button
+            v-for="produit in produitLookup.results"
+            :key="produit.id"
+            type="button"
+            class="lookup-result"
+            @click="selectionnerProduit(produit)"
+          >
+            <span class="lookup-designation">{{ produit.designation }}</span>
+            <span class="lookup-ref">{{ produit.ref_zacher || '—' }}</span>
+          </button>
+        </div>
+        <div v-if="produitLookup.selected" class="lookup-confirm">
+          <div class="lookup-label">Réf. Zacher pour ce produit :</div>
+          <input
+            type="text"
+            class="lookup-input"
+            v-model="produitLookup.selectedRef"
+            placeholder="Entrée Zacher…"
+          />
+          <div class="lookup-actions">
+            <button type="button" class="btn-mini" @click="fermerRechercheProduit">Annuler</button>
+            <button type="button" class="btn-mini primary" @click="confirmerProduitSelectionne">Confirmer</button>
+          </div>
+        </div>
+      </div>
+
+      
       <p class="footer-note">
         Les coches, DLC et numéros de lot sont sauvegardés automatiquement en base.
       </p>
@@ -633,9 +635,9 @@ tr.unsure:not(.done):hover td { background: #fff5e0; }
 .ref-zacher-picker:hover { border-color: #2f6f4f; background: #edf6f1; }
 .ref-zacher-picker.is-filled { background: #eaf7ea; border-color: #8ec49a; color: #2f6f4f; }
 .ref-zacher-popover {
-  position: absolute; top: calc(100% + 8px); left: 0; z-index: 20;
-  width: min(320px, 80vw); background: white; border: 1px solid #e8e3d5;
-  border-radius: 12px; box-shadow: 0 12px 28px rgba(26,42,74,0.14); padding: 10px; display: flex; flex-direction: column; gap: 8px;
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000;
+  width: min(340px, 90vw); background: white; border: 1px solid #e8e3d5;
+  border-radius: 12px; box-shadow: 0 12px 28px rgba(26,42,74,0.20); padding: 16px; display: flex; flex-direction: column; gap: 10px;
 }
 .popover-header { display: flex; justify-content: space-between; align-items: center; }
 .popover-close { border: none; background: transparent; color: #7a8898; font-size: 1rem; cursor: pointer; }
@@ -663,6 +665,11 @@ tr.unsure:not(.done):hover td { background: #fff5e0; }
   padding: 6px 10px; font-size: 0.76rem; font-weight: 600; cursor: pointer;
 }
 .btn-mini.primary { background: #2f6f4f; border-color: #2f6f4f; color: white; }
+.btn-mini:hover { background: #f5f2e8; }
+.btn-mini.primary:hover { background: #1f5f3f; }
+.lookup-backdrop {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(26,42,74,0.35); z-index: 999;
+}
 .dlc-text { cursor: pointer; color: #1a2a4a; }
 
 .footer-note { margin: 18px 0 0; font-size: 0.78rem; color: #7a8898; }
