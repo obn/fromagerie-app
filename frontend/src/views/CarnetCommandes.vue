@@ -47,6 +47,7 @@
             <tr>
               <th class="th-check"></th>
               <th>Désignation</th>
+              <th>Réf. Zacher</th>
               <th>PCB</th>
               <th>Qté</th>
               <th>DLC</th>
@@ -96,6 +97,18 @@
                     </span>
                   </template>
                 </div>
+              </td>
+
+              <!-- Réf. Zacher -->
+              <td>
+                <input
+                  type="text"
+                  class="field field-ref"
+                  placeholder="Réf."
+                  autocomplete="off"
+                  :value="etats[ligne.id]?.refZacher ?? ligne.ref_zacher ?? ''"
+                  @change="majRefZacher(ligne, $event.target.value)"
+                />
               </td>
 
               <!-- PCB -->
@@ -220,12 +233,13 @@ async function charger() {
     for (const commande of data) {
       for (const ligne of commande.lignes || []) {
         etats[ligne.id] = {
-          fait:    !!ligne.fait,
-          dlc:     ligne.dlc     ? ligne.dlc.slice(0, 10) : '',
-          lot:     ligne.numero_lot || '',
-          produit: ligne.designation_brute || '',
-          ref:     ligne.code_interne || ligne.gencod || '',
-          pcb:     ligne.pcb !== undefined && ligne.pcb !== null ? ligne.pcb : '',
+          fait:      !!ligne.fait,
+          dlc:       ligne.dlc ? ligne.dlc.slice(0, 10) : '',
+          lot:       ligne.numero_lot || '',
+          produit:   ligne.designation_brute || '',
+          ref:       ligne.code_interne || ligne.gencod || '',
+          refZacher: ligne.ref_zacher || '',
+          pcb:       ligne.pcb !== undefined && ligne.pcb !== null ? ligne.pcb : '',
         };
       }
     }
@@ -288,6 +302,23 @@ async function sauvegarderLigne(ligneId) {
   }
 }
 
+async function majRefZacher(ligne, valeur) {
+if (!ligne?.produit_id) return;
+const refZacher = (valeur ?? '').trim() || null;
+try {
+  await api.patch('/referentiels/produits/' + ligne.produit_id, { ref_zacher: refZacher });
+  if (!etats[ligne.id]) etats[ligne.id] = {};
+  etats[ligne.id].refZacher = refZacher || '';
+  ligne.ref_zacher = refZacher;
+  statutMsg.value = 'Réf. Zacher enregistrée ✓';
+  statutClass.value = 'ok';
+} catch (e) {
+  console.error('Échec sauvegarde Réf. Zacher', e);
+  statutMsg.value = 'Échec d\'enregistrement — ' + (e.message || '');
+  statutClass.value = 'erreur';
+}
+}
+
 // ── PCB sauvegarde immédiate (comme Commandes.vue) ─────────────────────────────
 async function majLignePcb(ligne, valeur) {
   // trouver la commande parente
@@ -321,7 +352,7 @@ async function reinitialiser() {
   if (!confirm('Effacer toutes les coches, DLC et numéros de lot pour cette journée ?')) return;
   for (const commande of commandes.value) {
     for (const ligne of commande.lignes || []) {
-      etats[ligne.id] = { fait: false, dlc: '', lot: '', produit: ligne.designation_brute || '', ref: ligne.code_interne || ligne.gencod || '' };
+      etats[ligne.id] = { fait: false, dlc: '', lot: '', produit: ligne.designation_brute || '', ref: ligne.code_interne || ligne.gencod || '', refZacher: ligne.ref_zacher || '' };
       const cid = commande.id;
       await api.patch(`/commandes/${cid}/lignes/${ligne.id}`, { fait: 0, dlc: null, numero_lot: null, fait_le: null });
     }
@@ -364,11 +395,12 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .client-block table { width: 100%; border-collapse: collapse; min-width: 0; }
 .client-block th, .client-block td { padding: 8px 10px; vertical-align: middle; text-align: left; }
 .client-block .th-check { width: 42px; }
-/* Columns: 1=check, 2=designation (flex), 3=PCB, 4=Qté, 5=DLC, 6=N° lot */
-.client-block th:nth-child(3), .client-block td:nth-child(3) { width: 5ch; max-width: 60px; }
-.client-block th:nth-child(4), .client-block td:nth-child(4) { width: 5ch; max-width: 60px; text-align: right; }
-.client-block th:nth-child(5), .client-block td:nth-child(5) { width: 11ch; max-width: 110px; }
-.client-block th:nth-child(6), .client-block td:nth-child(6) { width: 12ch; max-width: 140px; }
+/* Columns: 1=check, 2=designation (flex), 3=Réf. Zacher, 4=PCB, 5=Qté, 6=DLC, 7=N° lot */
+.client-block th:nth-child(3), .client-block td:nth-child(3) { width: 12ch; max-width: 120px; }
+.client-block th:nth-child(4), .client-block td:nth-child(4) { width: 5ch; max-width: 60px; }
+.client-block th:nth-child(5), .client-block td:nth-child(5) { width: 5ch; max-width: 60px; text-align: right; }
+.client-block th:nth-child(6), .client-block td:nth-child(6) { width: 11ch; max-width: 110px; }
+.client-block th:nth-child(7), .client-block td:nth-child(7) { width: 12ch; max-width: 140px; }
 .client-block td, .client-block th { word-break: break-word; }
 .design-text, .prodline { white-space: normal; }
 .pcb-input { width: 5ch; min-width: 48px; max-width: 60px; padding: 4px 6px; }
@@ -418,6 +450,7 @@ tr.unsure:not(.done):hover td { background: #fff5e0; }
 .field:focus { outline: none; border-color: #2f6f4f; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
 .field-dlc { width: 120px; max-width: 120px; }
 .field-lot { width: 60px; }
+.field-ref { width: 110px; min-width: 90px; text-align: left; }
 .dlc-text { cursor: pointer; color: #1a2a4a; }
 
 .footer-note { margin: 18px 0 0; font-size: 0.78rem; color: #7a8898; }

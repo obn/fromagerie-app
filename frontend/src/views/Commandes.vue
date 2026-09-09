@@ -80,10 +80,13 @@
         </div>
         <div v-if="panel.chargement" class="etat">Chargement…</div>
         <table v-else class="tbl-lignes">
-          <thead><tr><th>Désignation</th><th>PCB</th><th>Qté</th><th>DLC</th><th>N° lot</th></tr></thead>
+          <thead><tr><th>Désignation</th><th>Réf. Zacher</th><th>PCB</th><th>Qté</th><th>DLC</th><th>N° lot</th></tr></thead>
           <tbody>
             <tr v-for="l in panel.lignes" :key="l.id">
               <td>{{ l.designation_brute }}</td>
+              <td>
+                <input type="text" class="field field-ref" :value="l.ref_zacher || ''" @change="majLigneRefZacher(l, $event.target.value)" />
+              </td>
               <td>
                 <input type="number" class="field" :value="l.pcb !== null && l.pcb !== undefined ? l.pcb : ''" @change="majLignePcb(l, $event.target.value)" />
               </td>
@@ -228,6 +231,17 @@ async function majLigneLot(ligne, valeur) {
     ligne.numero_lot = valeur || null;
   } catch (e) {
     console.error('Échec sauvegarde N° lot', e);
+  }
+}
+
+async function majLigneRefZacher(ligne, valeur) {
+  if (!ligne?.produit_id) return;
+  const refZacher = (valeur ?? '').trim() || null;
+  try {
+    await api.patch('/referentiels/produits/' + ligne.produit_id, { ref_zacher: refZacher });
+    ligne.ref_zacher = refZacher;
+  } catch (e) {
+    console.error('Échec sauvegarde Réf. Zacher', e);
   }
 }
 
@@ -493,6 +507,7 @@ tr:hover { background: #faf8f2; }
 label { display: flex; flex-direction: column; gap: 5px; font-size: 0.85rem; font-weight: 600; color: #3a4a5a; }
 .inp { padding: 8px 10px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.875rem; width: 100%; box-sizing: border-box; }
 .inp:focus { outline: none; border-color: #2f6f4f; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
+.field-ref { width: 120px; min-width: 90px; text-align: left; }
 
 .tbl-lignes .total-row td { font-weight: 700; background: #f5f5f5; border-top: 2px solid #e8e3d5; }
 </style>

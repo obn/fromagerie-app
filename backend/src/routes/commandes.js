@@ -133,7 +133,7 @@ router.get('/:id', async (req, res) => {
       .leftJoin('tarifs_client_produit as t', function () {
         this.on('t.produit_id', '=', 'p.id').andOn('t.client_id', '=', knex.raw('?', [commande.client_id]));
       })
-      .select('lc.*', 'p.gencod', 'p.designation as designation_officielle',
+      .select('lc.*', 'p.gencod', 'p.designation as designation_officielle', 'p.ref_zacher',
               't.tarif_net', 't.tarif_general', 't.remise_pct', 't.unite_facturation as unite_tarif');
     res.json({ ...commande, lignes });
   } catch (e) { res.status(500).json({ error: e.message }); }

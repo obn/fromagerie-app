@@ -49,7 +49,7 @@
           <tbody>
             <tr v-for="p in filtres.produits" :key="p.id">
               <td class="mono">{{ p.gencod }}</td>
-              <td class="mono">{{ p.ref_zacher || '—' }}</td>
+              <td class="mono"><input class="inline-input" :value="p.ref_zacher || ''" @change="majRefZacherProduit(p, $event.target.value)" /></td>
               <td>{{ p.designation }}</td>
               <td>{{ p.unite || '—' }}</td>
               <td class="num">{{ p.dluo_jours ?? '—' }}</td>
@@ -178,6 +178,7 @@
       <template v-if="modal.type === 'produits'">
         <label>Gencod <input v-model="form.gencod" class="inp" :disabled="!!modal.item" /></label>
         <label>Désignation <input v-model="form.designation" class="inp" /></label>
+        <label>Réf. Zacher <input v-model="form.ref_zacher" class="inp" /></label>
         <label>Unité <input v-model="form.unite" placeholder="Kg, Pièce…" class="inp" /></label>
         <label>DLUO (jours) <input v-model.number="form.dluo_jours" type="number" class="inp" /></label>
         <label class="row-check"><input type="checkbox" v-model="form.actif" /> Actif</label>
@@ -308,20 +309,31 @@ function ouvrir(type, item = null) {
 
 function defaultForm(type) {
   if (type === 'clients')  return { nom: '', nom_facture: '', jour_fixe_livraison: '', actif: true };
-  if (type === 'produits') return { gencod: '', designation: '', unite: '', dluo_jours: null, actif: true };
+  if (type === 'produits') return { gencod: '', designation: '', ref_zacher: '', unite: '', dluo_jours: null, actif: true };
   if (type === 'tarifs')   return { client_id: '', produit_id: '', pcb: null, tarif_general: null, remise_pct: null, tarif_net: null, unite_facturation: '' };
   if (type === 'codes')    return { client_id: '', code_interne: '', produit_id: '' };
   if (type === 'interne')  return { code_interne: '', libelle_produit: '', famille_code: '' };
   return {};
 }
 
-async function sauvegarder() {
-  const t = modal.type;
-  const item = modal.item;
-  const body = { ...form.value };
-  if (body.produit_id === '') body.produit_id = null;
+async function majRefZacherProduit(produit, valeur) {
+ if (!produit?.id) return;
+ const refZacher = (valeur ?? '').trim() || null;
+ try {
+   await api.patch('/referentiels/produits/' + produit.id, { ref_zacher: refZacher });
+   produit.ref_zacher = refZacher;
+ } catch (e) {
+   console.error('Échec sauvegarde Réf. Zacher', e);
+ }
+}
 
-  if (t === 'clients') {
+async function sauvegarder() {
+ const t = modal.type;
+ const item = modal.item;
+ const body = { ...form.value };
+ if (body.produit_id === '') body.produit_id = null;
+
+ if (t === 'clients') {
     if (item) { await api.patch('/referentiels/clients/' + item.id, body); Object.assign(item, body); }
     else { const n = await api.post('/referentiels/clients', body); data.clients.push(n); }
   } else if (t === 'produits') {
@@ -392,5 +404,6 @@ tr:hover { background: #faf8f2; }
 label { display: flex; flex-direction: column; gap: 5px; font-size: 0.85rem; font-weight: 600; color: #3a4a5a; }
 .row-check { flex-direction: row; align-items: center; gap: 8px; font-weight: 500; }
 .inp { padding: 8px 10px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.875rem; background: white; width: 100%; box-sizing: border-box; }
-.inp:focus { outline: none; border-color: #2f6f4f; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
+.inline-input { width: 100%; min-width: 110px; padding: 6px 8px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.8rem; background: white; }
+.inp:focus, .inline-input:focus { outline: none; border-color: #2f6f4f; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
 </style>
