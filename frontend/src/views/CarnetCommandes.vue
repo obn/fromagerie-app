@@ -115,12 +115,56 @@
                     type="button"
                     class="ref-zacher-picker"
                     :class="{ 'is-filled': hasRefZacher(ligne) }"
-                    :title="hasRefZacher(ligne) ? 'Référence Zacher renseignée' : 'Ajouter une référence Zacher'"
-                    aria-label="Statut référence Zacher"
-                    disabled
+                    :title="hasRefZacher(ligne) ? 'Référence Zacher renseignée' : 'Chercher une référence Zacher'"
+                    aria-label="Chercher référence Zacher"
+                    @click="ouvrirRechercheProduit(ligne)"
                   >
-                    {{ hasRefZacher(ligne) ? '✓' : '—' }}
+                    {{ hasRefZacher(ligne) ? '✓' : '⋯' }}
                   </button>
+                  <!-- Popin recherche Zacher -->
+                  <div v-if="produitLookup.open && produitLookup.lineId === ligne.id" class="ref-zacher-popover">
+                    <div class="popover-header">
+                      <span style="font-weight: 600; font-size: 0.82rem;">Chercher ref. Zacher</span>
+                      <button type="button" class="popover-close" @click="fermerRechercheProduit">✕</button>
+                    </div>
+                    <input
+                      type="text"
+                      class="lookup-input"
+                      placeholder="Désignation produit…"
+                      v-model="produitLookup.query"
+                      @input="debounceRechercheProduit"
+                      @keydown.enter="() => {}"
+                    />
+                    <div v-if="produitLookup.loading" class="lookup-status">Recherche…</div>
+                    <div v-else-if="!produitLookup.results.length" class="lookup-status empty">
+                      {{ produitLookup.query ? 'Aucun résultat' : 'Tapez pour chercher' }}
+                    </div>
+                    <div v-else class="lookup-results">
+                      <button
+                        v-for="produit in produitLookup.results"
+                        :key="produit.id"
+                        type="button"
+                        class="lookup-result"
+                        @click="selectionnerProduit(produit)"
+                      >
+                        <span class="lookup-designation">{{ produit.designation }}</span>
+                        <span class="lookup-ref">{{ produit.ref_zacher || '—' }}</span>
+                      </button>
+                    </div>
+                    <div v-if="produitLookup.selected" class="lookup-confirm">
+                      <div class="lookup-label">Réf. Zacher pour ce produit :</div>
+                      <input
+                        type="text"
+                        class="lookup-input"
+                        v-model="produitLookup.selectedRef"
+                        placeholder="Entrée Zacher…"
+                      />
+                      <div class="lookup-actions">
+                        <button type="button" class="btn-mini" @click="fermerRechercheProduit">Annuler</button>
+                        <button type="button" class="btn-mini primary" @click="confirmerProduitSelectionne">Confirmer</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </td>
 
