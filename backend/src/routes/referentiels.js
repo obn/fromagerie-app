@@ -55,8 +55,16 @@ router.post('/produits', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 router.patch('/produits/:id', async (req, res) => {
-  try { await knex('produits').where({ id: req.params.id }).update(nettoyer(req.body)); res.json({ ok: true }); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  try {
+    const affected = await knex('produits').where({ id: req.params.id }).update(nettoyer(req.body));
+    if (!affected) {
+      return res.status(404).json({ error: `Produit introuvable (id=${req.params.id})` });
+    }
+    res.json({ ok: true, affectedRows: affected });
+  } catch (e) {
+    console.error('[referentiels] PATCH produits/:id failed', { id: req.params.id, body: req.body, error: e.message });
+    res.status(500).json({ error: e.message });
+  }
 });
 router.delete('/produits/:id', async (req, res) => {
   try { await knex('produits').where({ id: req.params.id }).del(); res.json({ ok: true }); }

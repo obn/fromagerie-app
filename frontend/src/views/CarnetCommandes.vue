@@ -430,11 +430,13 @@ async function rechercherProduitsParLibelle(ligne, search = '') {
 
  produitLookup.loading = true;
  try {
-   const results = await api.get(`/referentiels/produits?search=${encodeURIComponent(term)}`);
+   const results = await api.get(`/produits?search=${encodeURIComponent(term)}`);
    produitLookup.results = (results || []).slice(0, 8);
  } catch (e) {
-   console.error('Erreur recherche produit Zacher', e);
+   console.error('[CarnetCommandes] Erreur recherche produit Zacher', e);
    produitLookup.results = [];
+   statutMsg.value = 'Recherche produit impossible — ' + (e.message || '');
+   statutClass.value = 'erreur';
  } finally {
    produitLookup.loading = false;
  }
@@ -470,7 +472,8 @@ async function confirmerProduitSelectionne() {
 
  const refZacher = (produitLookup.selectedRef ?? '').trim() || null;
  try {
-   await api.patch('/referentiels/produits/' + produitLookup.selected.id, { ref_zacher: refZacher });
+   await api.patch(`/produits/${produitLookup.selected.id}`, { ref_zacher: refZacher });
+
    if (!etats[ligne.id]) etats[ligne.id] = {};
    etats[ligne.id].refZacher = refZacher || '';
    ligne.ref_zacher = refZacher;
@@ -478,7 +481,12 @@ async function confirmerProduitSelectionne() {
    statutClass.value = 'ok';
    fermerRechercheProduit();
  } catch (e) {
-   console.error('Échec mise à jour produit Zacher', e);
+   console.error('[CarnetCommandes] Échec mise à jour produit Zacher', {
+     selectedId: produitLookup.selected?.id,
+     selectedDesignation: produitLookup.selected?.designation,
+     refZacher,
+     error: e,
+   });
    statutMsg.value = 'Échec d\'enregistrement — ' + (e.message || '');
    statutClass.value = 'erreur';
  }

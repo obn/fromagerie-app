@@ -7,6 +7,7 @@ const cors = require('cors');
 const authRoutes         = require('./routes/auth');
 const commandesRoutes    = require('./routes/commandes');
 const carnetRoutes       = require('./routes/carnet');
+const produitsRoutes     = require('./routes/produits');
 const referentielsRoutes = require('./routes/referentiels');
 const parametresRoutes   = require('./routes/parametres');
 const gmailRoutes        = require('./routes/gmail');
@@ -23,9 +24,10 @@ app.get('/api/health', (req, res) => res.json({ ok: true, version: '1.0.0' }));
 // Authentification : ouverte (login) — /me protegee par requireAuth en interne
 app.use('/api/auth', authRoutes);
 
-// Carnet + Commandes : accessibles a tout utilisateur connecte (admin ou gestionnaire)
+// Carnet + Commandes + Produits : accessibles a tout utilisateur connecte (admin ou gestionnaire)
 app.use('/api/commandes', requireAuth, commandesRoutes);
 app.use('/api/carnet',    requireAuth, carnetRoutes);
+app.use('/api/produits',  requireAuth, produitsRoutes);
 
 // Referentiels + Parametres + Gmail : reserves aux admins uniquement
 app.use('/api/referentiels', requireRole('admin'), referentielsRoutes);
