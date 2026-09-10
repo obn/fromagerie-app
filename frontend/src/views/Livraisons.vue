@@ -10,11 +10,20 @@
         <button class="btn-nav" @click="semainePrecedente" aria-label="Semaine précédente">◀</button>
         <input type="date" class="inp" v-model="dateSelectionnee" @change="selectionnerDateIso($event.target.value)" aria-label="Sélectionner une date" />
         <button class="btn btn-current" :disabled="estSemaineCourante" @click="retourVersSemaineCourante" aria-label="Semaine courante">Aujourd'hui</button>
+        <button
+          class="btn-ico btn-recalc"
+          type="button"
+          :disabled="recalculEnCours"
+          :title="recalculEnCours ? 'Recalcul en cours…' : 'Recalculer les jours de livraison'"
+          @click="recalculerLivraisons"
+        >{{ recalculEnCours ? '⏳' : '↻' }}</button>
         <button class="btn-ico btn-week-products" type="button" title="Produits semaine" @click="ouvrirProduitsSemaine">🧀</button>
         <span class="week-range">{{ libellePeriode }}</span>
         <button class="btn-nav" @click="semaineSuivante" aria-label="Semaine suivante">▶</button>
       </div>
     </div>
+
+    <p v-if="statutMsg" :class="['statut-line', statutClass]">{{ statutMsg }}</p>
 
     <div v-if="chargement" class="etat">Chargement…</div>
 
@@ -223,6 +232,9 @@ const panelJourInfo = ref(null);
 const panelProduitsSemaineOuvert = ref(false);
 const produitsSemaine = ref([]);
 const chargementProduitsSemaine = ref(false);
+const recalculEnCours = ref(false);
+const statutMsg = ref('');
+const statutClass = ref('');
 
 // date selector (ISO yyyy-mm-dd) displayed next to nav buttons
 const dateSelectionnee = ref(formatDateISO(semaineSelectionnee.value));
@@ -331,6 +343,11 @@ function formatPrix(valeur) {
   if (valeur === null || valeur === undefined || valeur === '') return '—';
   const nombre = Number(String(valeur).replace(',', '.'));
   return Number.isFinite(nombre) ? `${nombre.toFixed(2)} €` : '—';
+}
+
+function notifier(message, type = 'ok') {
+  statutMsg.value = message || '';
+  statutClass.value = type || '';
 }
 
 async function ouvrirDetailCommande(commande) {
@@ -543,6 +560,25 @@ async function changerStatut(livraison, statut) {
   }
 }
 
+async function recalculerLivraisons() {
+  if (recalculEnCours.value) return;
+  recalculEnCours.value = true;
+  notifier('Recalcul des livraisons en cours…', '');
+  try {
+    const resultat = await api.post('/commandes/livraisons/recalculer', {});
+    await chargerSemaine();
+    notifier(
+      `Recalcul terminé ✓ (${resultat.updatedCommandes || 0} commande(s), ` +
+      `${resultat.updatedLivraisons || 0} livraison(s), ${resultat.createdLivraisons || 0} création(s))`,
+      'ok'
+    );
+  } catch (e) {
+    notifier(`Échec du recalcul — ${e.message || ''}`, 'erreur');
+  } finally {
+    recalculEnCours.value = false;
+  }
+}
+
 async function chargerSemaine() {
   chargement.value = true;
   try {
@@ -589,6 +625,8 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .toolbar { display: flex; align-items: center; gap: 12px; }
 .week-toolbar { background: white; border: 1px solid #e4dfcf; border-radius: 10px; padding: 6px 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
 .week-range { min-width: 220px; text-align: center; font-size: 0.9rem; color: #1a2a4a; font-weight: 600; }
+.statut-line { margin: -8px 0 12px; font-size: 0.78rem; color: #2f6f4f; text-align: right; }
+.statut-line.erreur { color: #b3261e; }
 .btn { border: none; background: #1a2a4a; color: white; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
 .btn:hover { opacity: 0.94; }
 .btn:disabled, .btn[disabled] { background: #d4d4d4; color: #7a7a7a; cursor: not-allowed; opacity: 1; }
@@ -619,6 +657,7 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .status-select { border: 1px solid #d0cbb8; border-radius: 6px; background: white; color: #1a2a4a; padding: 5px 8px; font-size: 0.72rem; }
 .btn-ico { border: none; background: transparent; cursor: pointer; padding: 6px 8px; border-radius: 6px; font-size: 0.9rem; }
 .btn-ico:hover { background: #f0ece0; }
+.btn-recalc:disabled { opacity: 0.55; cursor: wait; }
 .empty { margin: 12px 0 0; font-size: 0.82rem; color: #7a8898; text-align: center; }
 .badge-statut { display: inline-flex; align-items: center; justify-content: center; width: fit-content; min-width: 88px; padding: 4px 8px; border-radius: 999px; font-size: 0.69rem; font-weight: 700; line-height: 1.4; }
 .badge-statut.vert { background: #eef6ec; color: #2f6f4f; }

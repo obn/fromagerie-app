@@ -1,6 +1,7 @@
 const express = require('express');
 const knex = require('../db/knex');
 const { requireAuth } = require('../auth/middleware');
+const { calculerDateLivraison } = require('../pdf-parsing/inserer-commande');
 const router = express.Router();
 
 const CHAMPS_SYSTEME = ["id", "created_at", "updated_at", "client_nom"];
@@ -99,6 +100,88 @@ router.patch('/livraisons/:id', requireAuth, async (req, res) => {
     await knex('livraisons').where({ id: req.params.id }).update(update);
     const livraison = await knex('livraisons').where({ id: req.params.id }).first();
     res.json(livraison);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/commandes/livraisons/recalculer
+// Recalcule la date de livraison des commandes non livrees/annulees
+// a partir du jour fixe client courant (clients.jour_fixe_livraison).
+router.post('/livraisons/recalculer', requireAuth, async (req, res) => {
+  try {
+    const lignes = await knex('commandes as c')
+      .join('clients as cl', 'cl.id', 'c.client_id')
+      .leftJoin('livraisons as l', 'l.commande_id', 'c.id')
+      .select(
+        'c.id as commande_id',
+        'c.date_commande',
+        'c.date_livraison as commande_date_livraison',
+        'c.created_at',
+        'cl.jour_fixe_livraison',
+        'l.id as livraison_id',
+        'l.date_livraison as livraison_date_livraison',
+        'l.statut as livraison_statut'
+      )
+      .where(function () {
+        this.whereNull('l.id')
+          .orWhere(function () {
+            this.whereNull('l.statut').orWhereNotIn('l.statut', ['livree', 'annulee']);
+          });
+      });
+
+    const resultat = {
+      totalCandidates: lignes.length,
+      updatedCommandes: 0,
+      updatedLivraisons: 0,
+      createdLivraisons: 0,
+      skippedNoClientRule: 0,
+      skippedInvalidRule: 0,
+    };
+
+    await knex.transaction(async (trx) => {
+      for (const ligne of lignes) {
+        if (!ligne.jour_fixe_livraison) {
+          resultat.skippedNoClientRule += 1;
+          continue;
+        }
+
+        const ancrage = ligne.date_commande
+          ? formatDateISO(ligne.date_commande)
+          : formatDateISO(ligne.created_at);
+
+        const dateRecalculee = calculerDateLivraison(ancrage, ligne.jour_fixe_livraison);
+        if (!dateRecalculee) {
+          resultat.skippedInvalidRule += 1;
+          continue;
+        }
+
+        if (ligne.commande_date_livraison !== dateRecalculee) {
+          await trx('commandes')
+            .where({ id: ligne.commande_id })
+            .update({ date_livraison: dateRecalculee });
+          resultat.updatedCommandes += 1;
+        }
+
+        if (ligne.livraison_id) {
+          if (ligne.livraison_date_livraison !== dateRecalculee) {
+            await trx('livraisons')
+              .where({ id: ligne.livraison_id })
+              .update({ date_livraison: dateRecalculee });
+            resultat.updatedLivraisons += 1;
+          }
+        } else {
+          await trx('livraisons').insert({
+            commande_id: ligne.commande_id,
+            date_livraison: dateRecalculee,
+            statut: 'prevue',
+          });
+          resultat.createdLivraisons += 1;
+        }
+      }
+    });
+
+    res.json({ ok: true, ...resultat });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
