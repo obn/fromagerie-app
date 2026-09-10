@@ -10,7 +10,18 @@
       </label>
       <label>
         Mot de passe
-        <input v-model="motDePasse" type="password" required autocomplete="current-password" class="inp" />
+        <div class="password-wrap">
+          <input
+            v-model="motDePasse"
+            :type="motDePasseVisible ? 'text' : 'password'"
+            required
+            autocomplete="current-password"
+            class="inp"
+          />
+          <button type="button" class="btn-visibility" @click="motDePasseVisible = !motDePasseVisible">
+            {{ motDePasseVisible ? 'Masquer' : 'Voir' }}
+          </button>
+        </div>
       </label>
 
       <p v-if="erreur" class="erreur">{{ erreur }}</p>
@@ -30,6 +41,7 @@ import { login } from '../services/auth';
 const router = useRouter();
 const email = ref('');
 const motDePasse = ref('');
+const motDePasseVisible = ref(false);
 const erreur = ref('');
 const enCours = ref(false);
 
@@ -69,6 +81,21 @@ h1 { margin: 0; font-size: 1.5rem; color: #1a2a4a; text-align: center; }
 label { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; font-weight: 600; color: #3a4a5a; margin-bottom: 16px; }
 .inp { padding: 10px 12px; border: 1px solid #d0cbb8; border-radius: 6px; font-size: 0.95rem; }
 .inp:focus { outline: none; border-color: #2f6f4f; box-shadow: 0 0 0 2px rgba(47,111,79,0.2); }
+.password-wrap { position: relative; }
+.password-wrap .inp { width: 100%; box-sizing: border-box; padding-right: 72px; }
+.btn-visibility {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #2f6f4f;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 6px;
+}
 .erreur { color: #b3261e; font-size: 0.85rem; margin: 0 0 16px; text-align: center; }
 .btn { width: 100%; padding: 11px; border-radius: 6px; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
 .btn.primary { background: #2f6f4f; color: white; }
