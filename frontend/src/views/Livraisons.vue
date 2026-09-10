@@ -114,6 +114,7 @@
         <table v-else class="tbl-lignes">
           <thead>
             <tr>
+              <th class="th-check"></th>
               <th>Désignation</th>
               <th>Qté</th>
               <th>PCB</th>
@@ -122,7 +123,16 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(p, idx) in produitsJour" :key="p.code || p.designation || idx">
+            <tr v-for="(p, idx) in produitsJour" :key="p.code || p.designation || idx" :class="{ done: p.fait }">
+              <td class="td-check">
+                <input
+                  type="checkbox"
+                  class="check"
+                  :checked="!!p.fait"
+                  :disabled="!!p.saving"
+                  @change="cocherProduitJour(p, $event.target.checked)"
+                />
+              </td>
               <td>{{ p.designation }}</td>
               <td class="num">{{ p.quantite }}</td>
               <td class="mono">{{ p.pcb != null ? p.pcb : '—' }}</td>
@@ -130,9 +140,10 @@
               <td>{{ p.unite || '—' }}</td>
             </tr>
             <tr v-if="!produitsJour.length">
-              <td colspan="5" class="empty-line">Aucun produit pour cette journée.</td>
+              <td colspan="6" class="empty-line">Aucun produit pour cette journée.</td>
             </tr>
             <tr v-if="produitsJour.length" class="total-row">
+              <td></td>
               <td><strong>Total</strong></td>
               <td></td>
               <td></td>
@@ -411,11 +422,22 @@ async function ouvrirProduitsJour(jour) {
       const key = (l.code_interne && String(l.code_interne).trim()) || (l.designation_brute && String(l.designation_brute).trim()) || '__inconnu__';
       const quant = Number(l.quantite) || 0;
       if (!map.has(key)) {
-        map.set(key, { designation: l.designation_brute || l.reference || key, code: l.code_interne, quantite: quant, unite: l.unite || '', pcb: l.pcb != null ? l.pcb : null });
+        map.set(key, {
+          designation: l.designation_brute || l.reference || key,
+          code: l.code_interne,
+          quantite: quant,
+          unite: l.unite || '',
+          pcb: l.pcb != null ? l.pcb : null,
+          lignes: [{ id: l.id, commandeId: l.commande_id }],
+          fait: !!l.fait,
+          saving: false,
+        });
       } else {
         const cur = map.get(key);
         cur.quantite = (Number(cur.quantite) || 0) + quant;
         if (cur.pcb == null && l.pcb != null) cur.pcb = l.pcb;
+        cur.lignes.push({ id: l.id, commandeId: l.commande_id });
+        cur.fait = cur.fait && !!l.fait;
       }
     });
 
@@ -423,6 +445,29 @@ async function ouvrirProduitsJour(jour) {
     produitsJour.value = liste;
   } finally {
     chargementProduits.value = false;
+  }
+}
+
+async function cocherProduitJour(produit, checked) {
+  const lignes = Array.isArray(produit?.lignes) ? produit.lignes : [];
+  if (!lignes.length) return;
+  const ancienFait = !!produit.fait;
+  produit.fait = checked;
+  produit.saving = true;
+  try {
+    await Promise.all(
+      lignes.map((ligne) =>
+        api.patch('/commandes/' + ligne.commandeId + '/lignes/' + ligne.id, {
+          fait: checked ? 1 : 0,
+          fait_le: checked ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null,
+        })
+      )
+    );
+  } catch (e) {
+    produit.fait = ancienFait;
+    console.error('Échec sauvegarde coche produit du jour', e);
+  } finally {
+    produit.saving = false;
   }
 }
 
@@ -588,6 +633,10 @@ h1 { margin: 0; font-size: 1.4rem; color: #1a2a4a; }
 .tbl-lignes { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .tbl-lignes th { padding: 8px 14px; text-align: left; font-size: 0.71rem; text-transform: uppercase; color: #7a8898; border-bottom: 2px solid #e8e3d5; }
 .tbl-lignes td { padding: 9px 14px; border-bottom: 1px solid #f0ece0; }
+.tbl-lignes .th-check { width: 44px; padding-right: 8px; }
+.tbl-lignes .td-check { width: 44px; padding-right: 8px; }
+.check { width: 20px; height: 20px; accent-color: #2f6f4f; cursor: pointer; }
+.tbl-lignes tbody tr.done td { background: #eef6ec; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 .mono { font-family: monospace; font-size: 0.82rem; color: #4a7a5a; }
 .empty-line { text-align: center; color: #7a8898; }
