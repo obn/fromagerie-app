@@ -213,46 +213,58 @@ async function insererCommande(commande, options = {}) {
   let nbDeduitsParLibelle = 0;
 
   for (const ligne of commande.lignes || []) {
-    let codeInterne = ligne.codeInterne || null;
-    const refZacher = ligne.refZacher || ligne.ref_zacher || null;
-    let certitude = ligne.certitude || 'a_verifier';
+    try {
+      let codeInterne = ligne.codeInterne || null;
+      const refZacher = ligne.refZacher || ligne.ref_zacher || null;
+      let certitude = ligne.certitude || 'a_verifier';
 
-    // Deduction du code interne par rapprochement texte si absent du PDF
-    if (!codeInterne && !ligne.gencod && ligne.designationBrute) {
-      const trouve = trouverCodeParLibelle(ligne.designationBrute, catalogueInterne);
-      if (trouve) {
-        codeInterne = trouve.code;
-        nbDeduitsParLibelle++;
-        // Une deduction reste une supposition : on ne remonte jamais la certitude
-        // au-dessus de "a_verifier", meme si le texte matchait exactement.
-        if (certitude === 'haute') certitude = 'a_verifier';
+      // Deduction du code interne par rapprochement texte si absent du PDF
+      if (!codeInterne && !ligne.gencod && ligne.designationBrute) {
+        const trouve = trouverCodeParLibelle(ligne.designationBrute, catalogueInterne);
+        if (trouve) {
+          codeInterne = trouve.code;
+          nbDeduitsParLibelle++;
+          // Une deduction reste une supposition : on ne remonte jamais la certitude
+          // au-dessus de "a_verifier", meme si le texte matchait exactement.
+          if (certitude === 'haute') certitude = 'a_verifier';
+        }
       }
-    }
 
-    let produitId = null;
-    if (codeInterne) {
-      const ci = await knex('codes_internes')
-        .where({ client_id: client.id, code_interne: codeInterne })
-        .first();
-      if (ci?.produit_id) { produitId = ci.produit_id; nbResolues++; }
-    }
-    if (!produitId && ligne.gencod) {
-      const p = await knex('produits').where({ gencod: ligne.gencod }).first();
-      if (p) { produitId = p.id; nbResolues++; }
-    }
+      let produitId = null;
+      if (codeInterne) {
+        const ci = await knex('codes_internes')
+          .where({ client_id: client.id, code_interne: codeInterne })
+          .first();
+        if (ci?.produit_id) { produitId = ci.produit_id; nbResolues++; }
+      }
+      if (!produitId && ligne.gencod) {
+        const p = await knex('produits').where({ gencod: ligne.gencod }).first();
+        if (p) { produitId = p.id; nbResolues++; }
+      }
 
-    await knex('lignes_commande').insert({
-      commande_id:       commandeId,
-      code_interne:      codeInterne             || null,
-      ref_zacher:        refZacher,
-      produit_id:        produitId,
-      designation_brute: ligne.designationBrute  || null,
-      quantite:          ligne.quantite           || null,
-      unite:             ligne.unite              || null,
-      pcb:               ligne.pcb               || null,
-      certitude,
-      ligne_brute:       ligne.ligneBrute         || null,
-    });
+      await knex('lignes_commande').insert({
+        commande_id:       commandeId,
+        code_interne:      codeInterne             || null,
+        ref_zacher:        refZacher,
+        produit_id:        produitId,
+        designation_brute: ligne.designationBrute  || null,
+        quantite:          ligne.quantite           || null,
+        unite:             ligne.unite              || null,
+        pcb:               ligne.pcb               || null,
+        certitude,
+        ligne_brute:       ligne.ligneBrute         || null,
+      });
+    } catch (error) {
+      console.error('[import] Erreur insertion ligne_commande', {
+        commandeId,
+        numeroCommande: commande.numeroCommande,
+        client: commande.client,
+        ligne,
+        error,
+        stack: error && error.stack ? error.stack : null,
+      });
+      throw error;
+    }
   }
 
   const prefixeLog = importStatut === 'commande_existante_completee'

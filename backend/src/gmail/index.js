@@ -156,6 +156,12 @@ async function traiterMessage(accessToken, messageId) {
         const res = await insererCommande(commande, { gmailMessageId: messageId, dateReceptionMail: dateReceptionCalculee, nomFichierPdf: filename });
         rapport.pdfs.push({ filename, statut: res.doublon ? 'doublon' : 'insere', ...res });
       } catch (e) {
+        console.error('[gmail] Erreur traitement PDF', {
+          messageId,
+          filename,
+          error: e,
+          stack: e && e.stack ? e.stack : null,
+        });
         rapport.erreurs.push(`${filename} : ${e.message}`);
       }
     }

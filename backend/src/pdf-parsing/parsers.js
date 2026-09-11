@@ -978,7 +978,7 @@ function parserMaisonPerret(texte) {
   }
 
   return {
-    client: 'maison perret',
+    client: 'MAISON PERRET',
     numeroCommande: mCommande ? mCommande[1] : 'INCONNU',
     dateCommande: null,
     dateLivraison: mDateLivraison ? convertirDate(mDateLivraison[1]) : null,
