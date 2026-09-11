@@ -910,6 +910,82 @@ function convertirDate(dateStr) {
   return `${a}-${mo}-${j}`;
 }
 
+function normaliserTextePdf(texte) {
+  return (texte || '')
+    .replace(/\r/g, '')
+    .replace(/\u00a0/g, ' ');
+}
+
+function normaliserLigne(ligne) {
+  return (ligne || '').replace(/\s+/g, ' ').trim();
+}
+
+function extraireLigneProduitMaisonPerret(ligneBrute) {
+  const ligne = normaliserLigne(ligneBrute);
+  const regexLigneProduitMaisonPerret = /^(\d{6})(#([A-Za-z]{2,5}\d{1,4}))?(.+?)(\d+)\s*(PIECE|COL)(\d+[.,]\d{3})(\d+[.,]\d{2})$/i;
+  const match = ligne.match(regexLigneProduitMaisonPerret);
+
+  console.log(
+    `[parser maison perret] ligne candidate="${ligne}" commenceParCode=${/^\d{6}/.test(ligne)} matchRegex=${Boolean(match)}`
+  );
+
+  if (!match) return null;
+
+  const refZacher = match[3] ? match[3].toUpperCase() : null;
+  const designation = match[4] ? match[4].trim() : null;
+  if (!designation) return null;
+
+  return {
+    codeInterne: null,
+    gencod: null,
+    refZacher,
+    designationBrute: designation,
+    quantite: parseQte(match[5]),
+    unite: match[6].toUpperCase(),
+    certitude: refZacher ? 'haute' : 'a_verifier',
+    ligneBrute: ligne,
+  };
+}
+
+function parserMaisonPerret(texte) {
+  const texteNormalise = normaliserTextePdf(texte);
+  const mCommande = texteNormalise.match(/Bon\s+de\s+commande\s+N[o°]\s*([A-Z0-9-]+)/i);
+  const mDateLivraison = texteNormalise.match(/Date\s+de\s+livraison\s*:\s*(\d{2}\/\d{2}\/\d{4})/i);
+
+  const lignesTexte = texteNormalise.split('\n').map(normaliserLigne);
+  const lignes = [];
+
+  for (const ligne of lignesTexte) {
+    if (!ligne) continue;
+
+    const matchRegex = ligne.match(/^(\d{6})(#([A-Za-z]{2,5}\d{1,4}))?(.+?)(\d+)\s*(PIECE|COL)(\d+[.,]\d{3})(\d+[.,]\d{2})$/i);
+    console.log(
+      `[parser maison perret] ligne testee="${ligne}" matchRegex=${Boolean(matchRegex)}`
+    );
+
+    if (/^total\b/i.test(ligne) || /^total colis\b/i.test(ligne) || /^total poids\b/i.test(ligne)) {
+      continue;
+    }
+
+    if (!/^\d{6}/.test(ligne)) {
+      continue;
+    }
+
+    const ligneProduit = extraireLigneProduitMaisonPerret(ligne);
+    if (ligneProduit) {
+      lignes.push(ligneProduit);
+    }
+  }
+
+  return {
+    client: 'maison perret',
+    numeroCommande: mCommande ? mCommande[1] : 'INCONNU',
+    dateCommande: null,
+    dateLivraison: mDateLivraison ? convertirDate(mDateLivraison[1]) : null,
+    lignes,
+  };
+}
+
 
 // ── AUTO-DÉTECTION ────────────────────────────────────────────────────────────
 function detecterFournisseur(texte, nomFichier = '') {
@@ -918,6 +994,7 @@ function detecterFournisseur(texte, nomFichier = '') {
   if (t.includes('distral') || f.includes('distral')) return 'distral';
   if (t.includes('scapalyon') || t.includes('bcf') || f.includes('scapalyon')) return 'scapalyon';
   if (t.includes('logifresh') || f.includes('logifresh')) return 'logifresh';
+  if (t.includes('maison perret') || (t.includes('bon de commande no') && t.includes('votre réf. art.'))) return 'maison_perret';
   if (t.includes('piècecolis') || t.includes('site de livraison')) return 'chez_andre';
   if (t.includes('biocoop') || f.includes('biocoop')) return 'biocoop';
   if (t.includes('perrier')) return 'perrier';
@@ -932,6 +1009,7 @@ async function parserPdf(texte, nomFichier = '', buffer = null) {
   if (fournisseur === 'distral')    return parserDistral(texte);
   if (fournisseur === 'scapalyon') return await parserScapalyon(buffer);
   if (fournisseur === 'logifresh')  return parserLogifresh(texte);
+  if (fournisseur === 'maison_perret') return parserMaisonPerret(texte);
   if (fournisseur === 'chez_andre') return await parserChezAndre(texte);
   if (fournisseur === 'biocoop')    return await parserBiocoop(texte);
   if (fournisseur === 'ac2t')       return await parserAC2T(texte);
@@ -957,4 +1035,4 @@ async function parserPdf(texte, nomFichier = '', buffer = null) {
   };
 }
 
-module.exports = { parserPdf, parserDistral, parserScapalyon, parserLogifresh, parserChezAndre, detecterFournisseur, parseDateFr, parserBiocoop, parserAC2T,parserPerrier,parserProvidis,parserRelaisLocal};
+module.exports = { parserPdf, parserDistral, parserScapalyon, parserLogifresh, parserMaisonPerret, parserChezAndre, detecterFournisseur, parseDateFr, parserBiocoop, parserAC2T, parserPerrier, parserProvidis, parserRelaisLocal };

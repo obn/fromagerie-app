@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Présentation - Fromagerie App</title>
+  <style>
+    :root {
+      --bleu: #1a2a4a;
+      --vert: #2f6f4f;
+      --fond: #f6f3eb;
+      --carte: #ffffff;
+      --texte: #243244;
+      --secondaire: #6d7a89;
+      --bordure: #e6dfcf;
+    }
+
+    * { box-sizing: border-box; }
+
+    @page {
+      size: A4 landscape;
+      margin: 12mm;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--fond);
+      color: var(--texte);
+      line-height: 1.5;
+    }
+
+    .wrap {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, var(--bleu), #314a78);
+      color: white;
+      border-radius: 18px;
+      padding: 36px 32px;
+      margin-bottom: 24px;
+    }
+
+    .hero h1 {
+      margin: 0 0 10px;
+      font-size: 2.2rem;
+    }
+
+    .hero p {
+      margin: 0;
+      font-size: 1.05rem;
+      max-width: 760px;
+    }
+
+    .hero-focus {
+      margin-top: 18px;
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-weight: bold;
+      font-size: 0.95rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: var(--carte);
+      border: 1px solid var(--bordure);
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04);
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      color: var(--bleu);
+      font-size: 1.25rem;
+    }
+
+    h3 {
+      margin: 0 0 10px;
+      color: var(--vert);
+      font-size: 1rem;
+    }
+
+    ul {
+      margin: 10px 0 0 20px;
+      padding: 0;
+    }
+
+    li { margin-bottom: 8px; }
+
+    .steps {
+      display: grid;
+      gap: 12px;
+    }
+
+    .step {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      background: var(--carte);
+      border: 1px solid var(--bordure);
+      border-radius: 14px;
+      padding: 16px 18px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .num {
+      width: 32px;
+      height: 32px;
+      flex: 0 0 32px;
+      border-radius: 50%;
+      background: var(--vert);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+
+    .highlight {
+      background: #eef6ec;
+      border-left: 5px solid var(--vert);
+      padding: 16px 18px;
+      border-radius: 12px;
+      margin-top: 24px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .footer {
+      margin-top: 28px;
+      text-align: center;
+      color: var(--secondaire);
+      font-size: 0.92rem;
+    }
+
+    .small {
+      color: var(--secondaire);
+      font-size: 0.95rem;
+    }
+
+    .main-visual {
+      background: var(--carte);
+      border: 1px solid var(--bordure);
+      border-radius: 18px;
+      padding: 18px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .main-visual img {
+      width: 100%;
+      display: block;
+      border-radius: 12px;
+      border: 1px solid #ddd7c7;
+      margin: 14px 0 0;
+    }
+
+    .main-visual-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 0.9fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .key-points {
+      display: grid;
+      gap: 10px;
+    }
+
+    .key-point {
+      background: #fcfbf7;
+      border: 1px solid var(--bordure);
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+
+    .key-point strong {
+      color: var(--bleu);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .secondary-visual {
+      background: var(--carte);
+      border: 1px solid var(--bordure);
+      border-radius: 18px;
+      padding: 18px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+      break-before: page;
+      page-break-before: always;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .secondary-visual img {
+      width: 100%;
+      display: block;
+      border-radius: 12px;
+      border: 1px solid #ddd7c7;
+      margin-top: 14px;
+    }
+
+    .visuals {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 18px;
+      margin-bottom: 24px;
+    }
+
+    .screen {
+      background: var(--carte);
+      border: 1px solid var(--bordure);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
+    }
+
+    .screen-top {
+      background: var(--bleu);
+      color: white;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.92rem;
+      font-weight: bold;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.75);
+    }
+
+    .screen-body {
+      padding: 14px;
+      background: #fcfbf7;
+    }
+
+    .mini-toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .mini-pill {
+      background: #eef6ec;
+      color: var(--vert);
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 0.76rem;
+      font-weight: bold;
+    }
+
+    .mini-box {
+      background: white;
+      border: 1px solid var(--bordure);
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    .mini-title {
+      font-weight: bold;
+      color: var(--bleu);
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+    }
+
+    .mini-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 7px 0;
+      border-bottom: 1px solid #f0ece0;
+      font-size: 0.82rem;
+    }
+
+    .mini-row:last-child {
+      border-bottom: none;
+    }
+
+    .mini-check {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      border: 2px solid var(--vert);
+      background: #eef6ec;
+      position: relative;
+      flex: 0 0 16px;
+    }
+
+    .mini-check::after {
+      content: "✓";
+      position: absolute;
+      inset: -3px 0 0 2px;
+      font-size: 0.72rem;
+      color: var(--vert);
+      font-weight: bold;
+    }
+
+    .mini-badge {
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    .mini-badge.green {
+      background: #eef6ec;
+      color: var(--vert);
+    }
+
+    .mini-badge.gray {
+      background: #f0ece0;
+      color: #6d634f;
+    }
+
+    .mini-badge.blue {
+      background: #eaf3ff;
+      color: #1d5fbf;
+    }
+
+    .mini-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    .mini-table th,
+    .mini-table td {
+      padding: 7px 6px;
+      border-bottom: 1px solid #f0ece0;
+      text-align: left;
+    }
+
+    .mini-table th {
+      color: var(--secondaire);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+    }
+
+    .mini-legend {
+      color: var(--secondaire);
+      font-size: 0.82rem;
+      margin-top: 8px;
+    }
+
+    .annexe {
+      break-before: page;
+      page-break-before: always;
+    }
+
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 0.95rem;
+      background: white;
+    }
+
+    .compare-table th,
+    .compare-table td {
+      border: 1px solid var(--bordure);
+      padding: 12px 14px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .compare-table th {
+      background: #f3efe4;
+      color: var(--bleu);
+      font-size: 0.88rem;
+    }
+
+    .annexe-note {
+      margin-top: 14px;
+      background: #eef6ec;
+      border-left: 5px solid var(--vert);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+
+    @media (max-width: 860px) {
+      .main-visual-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media print {
+      body {
+        background: white;
+        font-size: 11pt;
+      }
+
+      .wrap {
+        max-width: none;
+        padding: 0;
+      }
+
+      .hero,
+      .main-visual,
+      .secondary-visual,
+      .card,
+      .highlight {
+        box-shadow: none;
+      }
+
+      .hero {
+        padding: 24px;
+      }
+
+      .hero h1 {
+        font-size: 22pt;
+      }
+
+      .hero p,
+      .small,
+      li,
+      .key-point,
+      .step,
+      .footer,
+      .compare-table {
+        font-size: 10.5pt;
+      }
+
+      .main-visual,
+      .secondary-visual,
+      .grid,
+      .card,
+      .highlight {
+        margin-bottom: 14px;
+      }
+
+      .grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+
+      .main-visual-grid {
+        grid-template-columns: 1.2fr 0.9fr;
+        gap: 14px;
+      }
+
+      img {
+        max-height: 150mm;
+        object-fit: contain;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>Présentation de Fromagerie App</h1>
+      <p>
+        Fromagerie App est une application simple de gestion des commandes,
+        de préparation et de suivi des livraisons pour une fromagerie.
+        Elle permet de gagner du temps, de limiter les erreurs manuelles
+        et de mieux suivre l’activité au quotidien.
+      </p>
+      <div class="hero-focus">Points clés de la démonstration : Carnet du jour puis Livraisons</div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>À quoi sert l’application ?</h2>
+        <ul>
+          <li>Centraliser les commandes clients dans un seul outil.</li>
+          <li>Aider à préparer les commandes du jour.</li>
+          <li>Suivre les livraisons prévues par jour.</li>
+          <li>Conserver un historique clair des commandes et des produits.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>Qui l’utilise ?</h2>
+        <ul>
+          <li>Le fromager ou l’équipe de préparation.</li>
+          <li>La personne qui suit les commandes clients.</li>
+          <li>Les responsables qui veulent une vision claire des livraisons.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>Les bénéfices principaux</h2>
+        <ul>
+          <li>Moins de ressaisie manuelle.</li>
+          <li>Moins d’oubli pendant la préparation.</li>
+          <li>Une meilleure visibilité sur les livraisons de la semaine.</li>
+          <li>Un suivi plus fiable des références, DLC et numéros de lot.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="card">
+      <h2>Comment ça fonctionne, simplement ?</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="num">1</div>
+          <div>
+            <strong>Réception des commandes dans Gmail</strong><br />
+            Les commandes clients arrivent d’abord par mail dans la messagerie.
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <div>
+            <strong>Déplacement des mails sélectionnés</strong><br />
+            Les mails utiles sont déplacés vers le répertoire ou label de synchronisation.
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <div>
+            <strong>Synchronisation dans l’application</strong><br />
+            Dans l’écran Paramètres, l’utilisateur lance la synchronisation pour importer les commandes.
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">4</div>
+          <div>
+            <strong>Organisation et suivi</strong><br />
+            Les commandes importées sont ensuite visibles dans Livraisons, Commandes et Carnet du jour.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Les écrans principaux</h2>
+      <div class="grid">
+        <div>
+          <h3>1. Carnet du jour</h3>
+          <p class="small">
+            Première page à consulter après synchronisation :
+            préparation des commandes, saisie des DLC, numéros de lot et suivi des lignes.
+          </p>
+        </div>
+        <div>
+          <h3>2. Commandes</h3>
+          <p class="small">
+            Historique des commandes avec consultation, modification
+            et suivi par période.
+          </p>
+        </div>
+        <div>
+          <h3>3. Livraisons</h3>
+          <p class="small">
+            Organisation des commandes par jour de livraison pour avoir
+            une vision simple de la semaine.
+          </p>
+        </div>
+        <div>
+          <h3>4. Référentiels</h3>
+          <p class="small">
+            Gestion des clients, produits, tarifs et codes internes.
+          </p>
+        </div>
+        <div>
+          <h3>5. Paramètres</h3>
+          <p class="small">
+            Réglages de l’application et outils liés à l’import des commandes.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="highlight">
+      <strong>En résumé :</strong>
+      cette application aide la fromagerie à mieux gérer ses commandes,
+      sécuriser la préparation, suivre les livraisons et garder une
+      information claire et centralisée.
+    </section>
+
+    <section class="main-visual">
+      <h2>Premier écran clé : Carnet du jour</h2>
+      <div class="main-visual-grid">
+        <div>
+          <p class="small">
+            Après la synchronisation, c’est la première page à consulter.
+            Elle permet de voir immédiatement les commandes du jour à préparer
+            et de suivre ligne par ligne l’avancement de la production.
+          </p>
+          <img src="./assets/carnet-du-jour.png" alt="Capture d'écran de la page Carnet du jour de l'application" />
+        </div>
+        <div class="key-points">
+          <div class="key-point">
+            <strong>Première étape après synchronisation</strong>
+            Les commandes importées apparaissent ici pour être traitées sans attendre.
+          </div>
+          <div class="key-point">
+            <strong>Saisie des informations terrain</strong>
+            C’est dans cet écran que sont renseignés la DLC et le numéro de lot.
+          </div>
+          <div class="key-point">
+            <strong>Suivi de préparation</strong>
+            Chaque ligne peut être cochée pour indiquer qu’elle a été préparée.
+          </div>
+          <div class="key-point">
+            <strong>Vision opérationnelle</strong>
+            Le fromager visualise ce qu’il reste à faire et sécurise la traçabilité.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="secondary-visual">
+      <h2>Deuxième écran clé : Livraisons</h2>
+      <div class="main-visual-grid">
+        <div>
+          <p class="small">
+            Cet écran donne une vue immédiate de la semaine, jour par jour.
+            C’est la page la plus utile pour piloter l’activité quotidienne :
+            voir qui livrer, quand, et suivre l’avancement.
+          </p>
+          <img src="./assets/livraisons.png" alt="Capture d'écran de la page Livraisons de l'application" />
+        </div>
+        <div class="key-points">
+          <div class="key-point">
+            <strong>Vue par jour</strong>
+            Les commandes sont réparties du lundi au vendredi pour savoir tout de suite ce qui part chaque jour.
+          </div>
+          <div class="key-point">
+            <strong>Lecture simple</strong>
+            Chaque carte affiche le client, le numéro de commande et le statut de livraison.
+          </div>
+          <div class="key-point">
+            <strong>Action rapide</strong>
+            En un clic, on peut ouvrir le détail, voir les produits du jour et mettre à jour le statut.
+          </div>
+          <div class="key-point">
+            <strong>Outil de pilotage</strong>
+            C’est l’écran idéal pour organiser la journée et anticiper la semaine.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card annexe">
+      <h2>Annexe — Solution d’hébergement</h2>
+      <h3>Scalingo vs Railway — synthèse</h3>
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Critère</th>
+            <th>Railway</th>
+            <th>Scalingo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Fiabilité</strong></td>
+            <td>5 incidents majeurs entre nov. 2025 et mai 2026, dont une panne de 8h ayant rendu les sauvegardes inaccessibles. Aucun SLA contractuel sur Hobby/Pro.</td>
+            <td>SLA explicite même sur l'offre Starter (98%) et bulletins de sécurité détaillés et réactifs.</td>
+          </tr>
+          <tr>
+            <td><strong>Sauvegardes</strong></td>
+            <td>Pas de backup automatique MySQL par défaut : il faut ajouter un service tiers.</td>
+            <td>Sauvegardes quotidiennes incluses dans tous les forfaits, sans configuration.</td>
+          </tr>
+          <tr>
+            <td><strong>Accès à la base de données</strong></td>
+            <td>Accès TCP public direct par défaut, pratique mais base exposée sur Internet.</td>
+            <td>Base privée par défaut, avec console distante, tunnel chiffré ou accès direct selon le besoin.</td>
+          </tr>
+          <tr>
+            <td><strong>Conformité et localisation</strong></td>
+            <td>Hébergement plutôt centré US, support en anglais.</td>
+            <td>RGPD, HDS, ISO 27001, datacenters à Paris, support en français.</td>
+          </tr>
+          <tr>
+            <td><strong>Coût pour ce projet</strong></td>
+            <td>Peut sembler gratuit au départ, mais backups et garanties manquantes reviennent vite dans le coût réel.</td>
+            <td>Starter (conteneur S + MySQL 512M) : environ 14,40 €/mois, avec une tarification simple et prévisible.</td>
+          </tr>
+          <tr>
+            <td><strong>Simplicité de démarrage</strong></td>
+            <td>Avantage net : déploiement quasi zéro-config et nombreux templates communautaires.</td>
+            <td>Un peu plus de mise en place initiale, mais reste raisonnable.</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="annexe-note">
+        <strong>En résumé :</strong>
+        Railway est plus rapide à démarrer. Scalingo est plus solide pour un usage métier quotidien :
+        fiabilité, sauvegardes incluses, conformité française et environnement plus rassurant.
+      </div>
+    </section>
+
+    <p class="footer">
+      Présentation simple de l’application — support pour démonstration orale.
+    </p>
+  </div>
+</body>
+</html>

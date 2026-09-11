@@ -139,14 +139,31 @@ async function insererCommande(commande, options = {}) {
     throw new Error(`Client "${commande.client}" introuvable en base — vérifier la table clients`);
   }
 
-  // ── Vérification doublon ──────────────────────────────────────────────────
+  // ── Vérification doublon / reprise d'une commande vide ───────────────────
   const existante = await knex('commandes')
     .where({ client_id: client.id, numero_commande: commande.numeroCommande })
     .first();
 
+  let commandeId = null;
+  let importStatut = 'cree';
+
   if (existante) {
-    console.log(`[import] Commande ${commande.numeroCommande} (${commande.client}) déjà en base — ignorée`);
-    return { doublon: true, commandeId: existante.id };
+    const resultatCount = await knex('lignes_commande')
+      .where({ commande_id: existante.id })
+      .count({ total: '*' })
+      .first();
+
+    const nbLignesExistantes = Number(resultatCount?.total || 0);
+
+    if (nbLignesExistantes > 0) {
+      console.log(
+        `[import] Commande ${commande.numeroCommande} (${commande.client}) déjà en base avec ${nbLignesExistantes} ligne(s) — doublon ignoré`
+      );
+      return { doublon: true, commandeId: existante.id, importStatut: 'doublon_ignore' };
+    }
+
+    commandeId = existante.id;
+    importStatut = 'commande_existante_completee';
   }
 
   // ── Calcul de la date de livraison réelle ─────────────────────────────────
@@ -162,26 +179,29 @@ async function insererCommande(commande, options = {}) {
   }
 
   // ── Insertion commande ────────────────────────────────────────────────────
-  const [commandeId] = await knex('commandes').insert({
-    numero_commande:          commande.numeroCommande,
-    client_id:                client.id,
-    date_commande:            commande.dateCommande       || options.dateReceptionMail || null,
-    date_livraison:           dateLivraisonCalculee        || null,
-    date_livraison_pdf_brute: commande.dateLivraison       || null, // conservée pour trace/audit
-    date_reception_mail:      dateReceptionMail            || null,
-    statut:                   'a_verifier',
-    source:                   'gmail',
-    gmail_message_id:         gmailMessageId,
-    fichier_pdf_url:          fichierPdfUrl,
-    nom_fichier_pdf:          options.nomFichierPdf        || null,
-  });
-
-  if (dateLivraisonCalculee) {
-    await knex('livraisons').insert({
-      commande_id: commandeId,
-      date_livraison: dateLivraisonCalculee,
-      statut: 'prevue',
+  if (!commandeId) {
+    const insertedIds = await knex('commandes').insert({
+      numero_commande:          commande.numeroCommande,
+      client_id:                client.id,
+      date_commande:            commande.dateCommande       || options.dateReceptionMail || null,
+      date_livraison:           dateLivraisonCalculee        || null,
+      date_livraison_pdf_brute: commande.dateLivraison       || null, // conservée pour trace/audit
+      date_reception_mail:      dateReceptionMail            || null,
+      statut:                   'a_verifier',
+      source:                   'gmail',
+      gmail_message_id:         gmailMessageId,
+      fichier_pdf_url:          fichierPdfUrl,
+      nom_fichier_pdf:          options.nomFichierPdf        || null,
     });
+    commandeId = insertedIds[0];
+
+    if (dateLivraisonCalculee) {
+      await knex('livraisons').insert({
+        commande_id: commandeId,
+        date_livraison: dateLivraisonCalculee,
+        statut: 'prevue',
+      });
+    }
   }
 
   // ── Chargement du catalogue interne une seule fois (table restreinte) ─────
@@ -194,6 +214,7 @@ async function insererCommande(commande, options = {}) {
 
   for (const ligne of commande.lignes || []) {
     let codeInterne = ligne.codeInterne || null;
+    const refZacher = ligne.refZacher || ligne.ref_zacher || null;
     let certitude = ligne.certitude || 'a_verifier';
 
     // Deduction du code interne par rapprochement texte si absent du PDF
@@ -223,6 +244,7 @@ async function insererCommande(commande, options = {}) {
     await knex('lignes_commande').insert({
       commande_id:       commandeId,
       code_interne:      codeInterne             || null,
+      ref_zacher:        refZacher,
       produit_id:        produitId,
       designation_brute: ligne.designationBrute  || null,
       quantite:          ligne.quantite           || null,
@@ -233,14 +255,17 @@ async function insererCommande(commande, options = {}) {
     });
   }
 
+  const prefixeLog = importStatut === 'commande_existante_completee'
+    ? `[import] Lignes ajoutées à la commande existante vide ${commande.numeroCommande} (${commande.client})`
+    : `[import] Commande créée ${commande.numeroCommande} (${commande.client})`;
+
   console.log(
-    `[import] Commande ${commande.numeroCommande} (${commande.client}) insérée — ` +
-    `livraison calculée : ${dateLivraisonCalculee || 'non déterminée'} — ` +
+    `${prefixeLog} — livraison calculée : ${dateLivraisonCalculee || 'non déterminée'} — ` +
     `${commande.lignes.length} ligne(s), ${nbResolues} résolu(s), ${nbDeduitsParLibelle} code(s) déduit(s) par libellé`
   );
 
   return {
-    doublon: false, commandeId,
+    doublon: false, commandeId, importStatut,
     nbLignes: commande.lignes.length,
     nbResolues, nbDeduitsParLibelle,
     dateLivraisonCalculee,
